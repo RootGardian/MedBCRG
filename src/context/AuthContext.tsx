@@ -11,33 +11,46 @@ interface AuthContextType {
 const MOCK_USER: User = {
   id: 'USR-BCRG-01',
   name: 'Dr. Ousmane Bangoura',
-  email: 'o.bangoura@bcrg.gov.gn',
+  email: 'o.bangoura@bcrg-guinee.org',
   role: 'MEDECIN',
   title: 'Médecin Chef d\'Infirmerie',
   avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80',
+};
+
+const MOCK_ADMIN: User = {
+  id: 'USR-BCRG-ADMIN',
+  name: 'Admin BCRG',
+  email: 'admin@bcrg-guinee.org',
+  role: 'ADMIN' as any,
+  title: 'Administrateur / RH',
+  avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
 };
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('bcrg_auth_user');
+    const saved = sessionStorage.getItem('bcrg_auth_user');
     return saved ? JSON.parse(saved) : null;
   });
 
   useEffect(() => {
     if (user) {
-      localStorage.setItem('bcrg_auth_user', JSON.stringify(user));
+      sessionStorage.setItem('bcrg_auth_user', JSON.stringify(user));
     } else {
-      localStorage.removeItem('bcrg_auth_user');
+      sessionStorage.removeItem('bcrg_auth_user');
     }
   }, [user]);
 
   const login = (role = 'MEDECIN') => {
-    setUser({
-      ...MOCK_USER,
-      role: role as any,
-    });
+    if (role === 'ADMIN') {
+      setUser(MOCK_ADMIN);
+    } else {
+      setUser({
+        ...MOCK_USER,
+        role: role as any,
+      });
+    }
   };
 
   const logout = () => {

@@ -1,17 +1,22 @@
 import React from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { Sidebar } from '../common/Sidebar';
 import { Header } from '../common/Header';
 import { useAuth } from '../../hooks/useAuth';
 
 export const MainLayout: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const location = useLocation();
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const [sidebarWidth, setSidebarWidth] = React.useState(280);
   const [isMobileOpen, setIsMobileOpen] = React.useState(false);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (user?.role === 'ADMIN' && location.pathname === '/') {
+    return <Navigate to="/admin/stats" replace />;
   }
 
   return (

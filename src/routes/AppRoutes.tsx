@@ -13,6 +13,8 @@ import { RendezVousPage } from '../pages/RendezVous/RendezVousPage';
 import { SettingsPage } from '../pages/Settings/SettingsPage';
 import { NotFoundPage } from '../pages/NotFound/NotFoundPage';
 import { LoginPage } from '../pages/Auth/LoginPage';
+import { AdminPage } from '../pages/Admin/AdminPage';
+import { UsersManagementPage } from '../pages/Admin/UsersManagementPage';
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -25,6 +27,12 @@ export const AppRoutes: React.FC = () => {
         <Route path="pharmacie" element={<PharmaciePage />} />
         <Route path="rendez-vous" element={<RendezVousPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="admin" element={<Navigate to="/admin/stats" replace />} />
+        <Route path="admin/stats" element={<AdminPage />} />
+        <Route path="admin/users" element={<UsersManagementPage />} />
+        <Route path="admin/settings" element={<AdminPage />} />
+        <Route path="admin/campaigns" element={<AdminPage />} />
+        <Route path="admin/logs" element={<AdminPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

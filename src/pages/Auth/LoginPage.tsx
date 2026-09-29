@@ -33,6 +33,10 @@ export const LoginPage: React.FC = () => {
         login('MEDECIN');
         navigate('/');
         showToast('Bienvenue', 'Connexion réussie au portail Médecin', 'success');
+      } else if (matricule === '2001' && password === 'medi1') {
+        login('ADMIN');
+        navigate('/admin');
+        showToast('Bienvenue', 'Connexion réussie au portail Administration & RH', 'success');
       } else {
         showToast('Échec', 'Matricule ou mot de passe incorrect.', 'error');
       }

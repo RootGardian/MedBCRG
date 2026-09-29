@@ -8,16 +8,26 @@ import {
   Pill,
   Settings,
   LogOut,
-  ChevronLeft
+  ChevronLeft,
+  BarChart3,
+  Settings2,
+  Activity,
+  CalendarClock
 } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 import bcrgLogo from '../../assets/bcrg_logo.png';
 
 const NAV_ITEMS = [
-  { name: 'Tableau de bord', path: '/', icon: LayoutDashboard },
-  { name: 'Consultations', path: '/consultations', icon: Stethoscope },
-  { name: 'Dossiers Médical', path: '/patients', icon: Users },
-  { name: 'Agenda', path: '/rendez-vous', icon: CalendarDays },
-  { name: 'Pharmacie', path: '/pharmacie', icon: Pill },
+  { name: 'Tableau de bord', path: '/', icon: LayoutDashboard, roles: ['MEDECIN'] },
+  { name: 'Consultations', path: '/consultations', icon: Stethoscope, roles: ['MEDECIN'] },
+  { name: 'Dossiers Médical', path: '/patients', icon: Users, roles: ['MEDECIN'] },
+  { name: 'Agenda', path: '/rendez-vous', icon: CalendarDays, roles: ['MEDECIN'] },
+  { name: 'Pharmacie', path: '/pharmacie', icon: Pill, roles: ['MEDECIN'] },
+  { name: 'Statistiques', path: '/admin/stats', icon: BarChart3, roles: ['ADMIN'] },
+  { name: 'Gestion Comptes', path: '/admin/users', icon: Users, roles: ['ADMIN'] },
+  { name: 'Périodicité Visites', path: '/admin/settings', icon: CalendarClock, roles: ['ADMIN'] },
+  { name: 'Logs & Audit', path: '/admin/logs', icon: Activity, roles: ['ADMIN'] },
+
 ];
 
 interface SidebarProps {
@@ -30,6 +40,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, width, setWidth, isMobileOpen, setIsMobileOpen }) => {
+  const { user } = useAuth();
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -50,15 +61,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, width, 
   };
 
   return (
-    <aside 
-      className={`h-screen bg-[#1b3b31] text-white flex flex-col fixed left-0 top-0 z-50 shadow-xl transition-transform duration-300 ${
-        isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-      } ${isCollapsed ? 'lg:w-20' : ''}`}
+    <aside
+      className={`h-screen bg-[#1b3b31] text-white flex flex-col fixed left-0 top-0 z-50 shadow-xl transition-transform duration-300 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        } ${isCollapsed ? 'lg:w-20' : ''}`}
       style={{ width: isCollapsed ? '80px' : `${width}px` }}
     >
       {/* Resize Handle */}
       {!isCollapsed && (
-        <div 
+        <div
           onMouseDown={handleMouseDown}
           className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-sky-500/50 active:bg-sky-500 z-50 transition-colors"
         />
@@ -82,7 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, width, 
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto">
-        {NAV_ITEMS.map((item) => (
+        {NAV_ITEMS.filter(item => item.roles.includes(user?.role || 'MEDECIN')).map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
