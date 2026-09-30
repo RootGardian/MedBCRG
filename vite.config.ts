@@ -15,7 +15,7 @@ export default defineConfig({
       manifest: {
         name: 'MedBCRG',
         short_name: 'MedBCRG',
-        description: 'Gestion Médicale & Pharmacie de la BCRG',
+        description: 'Gestion Médicale de la BCRG',
         theme_color: '#1b3b31',
         background_color: '#ffffff',
         display: 'standalone',
