@@ -10,8 +10,8 @@ export const NotFoundPage: React.FC = () => {
       <p className="text-slate-500 mt-2 max-w-md">
         La page que vous recherchez n'existe pas ou a été déplacée.
       </p>
-      <Link 
-        to="/" 
+      <Link
+        to="/"
         className="mt-8 flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white px-6 py-3 rounded-xl font-medium transition-colors shadow-sm shadow-sky-200"
       >
         <Home className="w-5 h-5" />

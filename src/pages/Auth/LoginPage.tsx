@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotifications } from '../../hooks/useNotifications';
-import bcrgLogo from '../../assets/bcrg_logo.png';
+import medLogo from '../../assets/icon_Med.png';
 
 export const LoginPage: React.FC = () => {
   const [matricule, setMatricule] = useState('');
@@ -37,6 +37,10 @@ export const LoginPage: React.FC = () => {
         login('ADMIN');
         navigate('/admin');
         showToast('Bienvenue', 'Connexion réussie au portail Administration & RH', 'success');
+      } else if (matricule === '2002' && password === 'medi1') {
+        login('PATIENT');
+        navigate('/patient');
+        showToast('Bienvenue', 'Connexion réussie au portail Employé/Patient', 'success');
       } else {
         showToast('Échec', 'Matricule ou mot de passe incorrect.', 'error');
       }
@@ -59,18 +63,18 @@ export const LoginPage: React.FC = () => {
         </div>
 
         <div className="z-10 flex flex-col items-center">
-          <img src={bcrgLogo} alt="BCRG Logo" className="w-80 mb-10 drop-shadow-lg" />
-          <h1 className="text-5xl font-extrabold tracking-wide drop-shadow-md">MedBCRG</h1>
+          <img src={medLogo} alt="MedBCRG Logo" className="w-56 mb-10 rounded-[2rem] shadow-2xl" />
+          <h1 className="text-5xl font-extrabold tracking-wide drop-shadow-md mt-4">MedBCRG</h1>
         </div>
       </div>
 
       {/* Right Panel - Login Form */}
-      <div className="w-full lg:w-1/2 bg-white flex flex-col items-center justify-center relative px-8 sm:px-16">
-        <div className="w-full max-w-md">
+      <div className="w-full lg:w-1/2 bg-white flex flex-col items-center justify-between relative px-8 sm:px-16 py-12 lg:py-0 overflow-y-auto h-screen">
+        <div className="w-full max-w-md my-auto">
           {/* Mobile Logo (hidden on desktop) */}
           <div className="lg:hidden flex flex-col items-center mb-10">
-            <div className="p-4 bg-[#1b3b31] rounded-2xl mb-4">
-              <img src={bcrgLogo} alt="BCRG Logo" className="w-32" />
+            <div className="p-2 bg-[#1b3b31] rounded-[1.5rem] mb-4 shadow-lg overflow-hidden inline-flex">
+              <img src={medLogo} alt="MedBCRG Logo" className="w-24 rounded-[1rem]" />
             </div>
             <h1 className="text-4xl font-extrabold text-[#1b3b31] tracking-tight">MedBCRG</h1>
           </div>
@@ -95,7 +99,7 @@ export const LoginPage: React.FC = () => {
                   value={matricule}
                   onChange={(e) => setMatricule(e.target.value)}
                   placeholder="ex: 1234"
-                  className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded outline-none focus:border-[#1b3b31] focus:ring-1 focus:ring-[#1b3b31] transition-all text-sm text-slate-700 bg-white"
+                  className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded outline-none focus:border-[#1b3b31] focus:ring-1 focus:ring-[#1b3b31] transition-all text-base text-slate-700 bg-white"
                 />
               </div>
             </div>
@@ -114,7 +118,7 @@ export const LoginPage: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full pl-11 pr-12 py-2.5 border border-slate-200 rounded outline-none focus:border-[#1b3b31] focus:ring-1 focus:ring-[#1b3b31] transition-all text-sm text-slate-700 bg-white"
+                  className="w-full pl-11 pr-12 py-2.5 border border-slate-200 rounded outline-none focus:border-[#1b3b31] focus:ring-1 focus:ring-[#1b3b31] transition-all text-base text-slate-700 bg-white"
                 />
                 <button
                   type="button"
@@ -145,7 +149,7 @@ export const LoginPage: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <p className="absolute bottom-8 text-xs text-slate-400 text-center w-full px-8">
+        <p className="text-xs text-slate-400 text-center w-full mt-8">
           © {new Date().getFullYear()} Banque Centrale de la République de Guinée. Tous droits réservés.
         </p>
       </div>

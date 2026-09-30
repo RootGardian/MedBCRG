@@ -11,7 +11,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon_Med.png'],
+      includeAssets: ['pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
         name: 'MedBCRG',
         short_name: 'MedBCRG',
@@ -21,17 +21,17 @@ export default defineConfig({
         display: 'standalone',
         icons: [
           {
-            src: '/icon_Med.png',
+            src: '/pwa-192x192.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: '/icon_Med.png',
+            src: '/pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png'
           },
           {
-            src: '/icon_Med.png',
+            src: '/pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'

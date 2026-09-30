@@ -26,6 +26,15 @@ const MOCK_ADMIN: User = {
   avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
 };
 
+const MOCK_PATIENT: User = {
+  id: 'USR-BCRG-PATIENT',
+  name: 'Employé Patient',
+  email: 'patient@bcrg-guinee.org',
+  role: 'PATIENT' as any,
+  title: 'Employé BCRG',
+  avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+};
+
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -45,6 +54,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = (role = 'MEDECIN') => {
     if (role === 'ADMIN') {
       setUser(MOCK_ADMIN);
+    } else if (role === 'PATIENT') {
+      setUser(MOCK_PATIENT);
     } else {
       setUser({
         ...MOCK_USER,

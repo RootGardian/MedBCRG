@@ -21,25 +21,25 @@ export const SettingsPage: React.FC = () => {
     <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
       
       {/* Top Actions */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <button 
           onClick={() => navigate(-1)}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 h-10 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm whitespace-nowrap"
         >
           <ArrowLeft className="w-4 h-4" />
           Retour
         </button>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           <button 
             onClick={() => setIsPasswordModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm"
+            className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2 h-10 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm whitespace-nowrap"
           >
             <Key className="w-4 h-4" />
             Changer le mot de passe
           </button>
           <button 
             onClick={logout}
-            className="flex items-center gap-2 px-4 py-2 bg-rose-50 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors text-sm font-medium shadow-sm"
+            className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2 h-10 bg-rose-50 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors text-sm font-medium shadow-sm whitespace-nowrap"
           >
             <LogOut className="w-4 h-4" />
             Se déconnecter

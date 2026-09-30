@@ -12,7 +12,9 @@ import {
   BarChart3,
   Settings2,
   Activity,
-  CalendarClock
+  CalendarClock,
+  RefreshCw,
+  Upload
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import bcrgLogo from '../../assets/bcrg_logo.png';
@@ -27,7 +29,9 @@ const NAV_ITEMS = [
   { name: 'Gestion Comptes', path: '/admin/users', icon: Users, roles: ['ADMIN'] },
   { name: 'Périodicité Visites', path: '/admin/settings', icon: CalendarClock, roles: ['ADMIN'] },
   { name: 'Logs & Audit', path: '/admin/logs', icon: Activity, roles: ['ADMIN'] },
-
+  { name: 'Mon Espace', path: '/patient', icon: LayoutDashboard, roles: ['PATIENT'] },
+  { name: 'Prendre Rendez-vous', path: '/patient/rendez-vous', icon: CalendarDays, roles: ['PATIENT'] },
+  { name: 'Ajouter un Document', path: '/patient/documents', icon: Upload, roles: ['PATIENT'] },
 ];
 
 interface SidebarProps {
@@ -96,6 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, width, 
           <NavLink
             key={item.path}
             to={item.path}
+            end
             onClick={() => setIsMobileOpen?.(false)}
             title={isCollapsed ? item.name : undefined}
             className={({ isActive }) =>

@@ -15,6 +15,9 @@ import { NotFoundPage } from '../pages/NotFound/NotFoundPage';
 import { LoginPage } from '../pages/Auth/LoginPage';
 import { AdminPage } from '../pages/Admin/AdminPage';
 import { UsersManagementPage } from '../pages/Admin/UsersManagementPage';
+import { PatientPortalPage } from '../pages/Patient/PatientPortalPage';
+import { PatientDocumentsPage } from '../pages/Patient/PatientDocumentsPage';
+import { PatientRendezVousPage } from '../pages/Patient/PatientRendezVousPage';
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -33,6 +36,14 @@ export const AppRoutes: React.FC = () => {
         <Route path="admin/settings" element={<AdminPage />} />
         <Route path="admin/campaigns" element={<AdminPage />} />
         <Route path="admin/logs" element={<AdminPage />} />
+        
+        {/* Patient Portal */}
+        <Route path="patient" element={<PatientPortalPage />} />
+        <Route path="patient/rendez-vous" element={<PatientRendezVousPage />} />
+        <Route path="patient/suivi" element={<PatientPortalPage />} />
+        <Route path="patient/renouvellement" element={<PatientPortalPage />} />
+        <Route path="patient/documents" element={<PatientDocumentsPage />} />
+
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
