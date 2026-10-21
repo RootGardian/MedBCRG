@@ -174,8 +174,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    sessionStorage.removeItem('bcrg_auth_user');
+    sessionStorage.removeItem('bcrg_access_token');
     setUser(null);
+    const hubUrl = import.meta.env.VITE_BCRG_HUB_URL || 'http://localhost:5173';
+    window.location.href = hubUrl;
   };
+
+  // Surveillance proactive de la validité de la session (Single Logout - SLO)
+  useEffect(() => {
+    if (!user) return;
+
+    const checkSessionValidity = async () => {
+      const token = sessionStorage.getItem('bcrg_access_token');
+      if (!token) {
+        logout();
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.status === 401) {
+          console.warn('[SLO Watchdog] Session révoquée par Single Logout (SLO). Redirection vers le Hub...');
+          logout();
+        }
+      } catch (err) {
+        // Ignorer les erreurs réseau temporaires
+      }
+    };
+
+    const onFocus = () => {
+      checkSessionValidity();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkSessionValidity();
+      }
+    };
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    const interval = setInterval(checkSessionValidity, 15000);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      clearInterval(interval);
+    };
+  }, [user]);
 
   return (
     <AuthContext.Provider
