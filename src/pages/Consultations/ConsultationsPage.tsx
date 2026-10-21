@@ -244,7 +244,17 @@ export const ConsultationsPage: React.FC = () => {
       }
     }
 
-    // Save to DB
+    // Clôture officielle via le nouvel endpoint /api/doctor/consultations/:id/complete
+    try {
+      await apiService.completeConsultation(openConsultation.id, {
+        diagnosis: editDiagnosis,
+        advice: editNotes
+      });
+    } catch (err) {
+      console.warn('Fallback updateConsultation complete:', err);
+    }
+
+    // Enregistrement de mise à jour locale & DB
     const res = await apiService.updateConsultation(openConsultation.id, {
       diagnosis: editDiagnosis,
       notes: editNotes,
@@ -255,7 +265,7 @@ export const ConsultationsPage: React.FC = () => {
       const updated = consultations.map(c => c.id === openConsultation.id ? res : c);
       setConsultations(updated);
       setOpenConsultation(null);
-      showToast('Consultation terminée', 'La consultation a été clôturée et l\'ordonnance PDF a été générée automatiquement.', 'success');
+      showToast('Consultation terminée', 'La consultation a été clôturée avec succès et l\'ordonnance PDF a été archivée.', 'success');
     }
   };
 

@@ -93,9 +93,44 @@ export interface Appointment {
   patientMatricule: string;
   doctorName: string;
   dateTime: string;
+  appointmentDate?: string;
+  scheduledTime?: string;
+  durationMinutes?: number;
+  type?: string;
+  typeLabel?: string;
   reason: string;
-  status: 'PROGRAMME' | 'CONFIRME' | 'ANNULE' | 'TERMINE';
+  doctorNotes?: string | null;
+  cancellationReason?: string | null;
+  status: 'PROGRAMME' | 'CONFIRME' | 'ANNULE' | 'TERMINE' | 'SCHEDULED' | 'RESCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
 }
+
+export interface VisitPeriodicitySettings {
+  id?: string;
+  standardFrequencyMonths: number;
+  smrFrequencyMonths: number;
+  reminderLeadDays: number;
+  updatedAt?: string;
+}
+
+export interface DueEmployeeItem {
+  id: string;
+  matricule: string;
+  fullName: string;
+  department?: string;
+  lastVisitDate?: string;
+  nextDueDate?: string;
+  status: 'A_JOUR' | 'BIENTOT_DUE' | 'EN_RETARD';
+}
+
+export interface AvailableSlotsResponse {
+  date: string;
+  formattedDate: string;
+  isWorkingDay: boolean;
+  totalSlots: number;
+  availableSlots: string[];
+  occupiedSlots: string[];
+}
+
 
 export interface DashboardStats {
   consultationsToday: number;

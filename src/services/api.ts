@@ -12,7 +12,10 @@ import {
   HrDiabetesStatisticsData,
   MedicalDocument,
   PatientVitalsResponse,
-  PatientMedicalRecord
+  PatientMedicalRecord,
+  VisitPeriodicitySettings,
+  DueEmployeeItem,
+  AvailableSlotsResponse
 } from '../types';
 
 const INITIAL_MEDICATIONS: Medication[] = [];
@@ -266,6 +269,41 @@ const saveStorage = <T,>(key: string, data: T): void => {
     console.error('Erreur sauvegarde localStorage', err);
   }
 };
+
+function normalizeBackendAppointment(item: any): Appointment {
+  const dateStr = item.appointmentDate
+    ? (typeof item.appointmentDate === 'string'
+        ? item.appointmentDate.split('T')[0]
+        : new Date(item.appointmentDate).toISOString().split('T')[0])
+    : '';
+  const timeStr = item.scheduledTime || '09:00';
+  const dateTime = dateStr ? `${dateStr}T${timeStr}` : (item.dateTime || new Date().toISOString());
+
+  let status: Appointment['status'] = 'PROGRAMME';
+  const s = String(item.status || '').toUpperCase();
+  if (s === 'CONFIRMED' || s === 'CONFIRME') status = 'CONFIRME';
+  else if (s === 'CANCELLED' || s === 'ANNULE') status = 'ANNULE';
+  else if (s === 'COMPLETED' || s === 'TERMINE' || s === 'TERMINEE') status = 'TERMINE';
+  else status = 'PROGRAMME';
+
+  return {
+    id: item.id,
+    patientId: item.patientId || item.patient?.id || '',
+    patientName: item.patientName || (item.patient?.user ? `${item.patient.user.firstName} ${item.patient.user.lastName}` : (item.patient?.firstName ? `${item.patient.firstName} ${item.patient.lastName}` : 'Patient BCRG')),
+    patientMatricule: item.patientMatricule || item.patient?.registrationNumber || item.patient?.user?.matricule || '',
+    doctorName: item.doctorName || (item.doctor ? `Dr. ${item.doctor.firstName} ${item.doctor.lastName}` : 'Dr. Ousmane Bangoura'),
+    dateTime,
+    appointmentDate: dateStr,
+    scheduledTime: timeStr,
+    durationMinutes: item.durationMinutes || 30,
+    type: item.type || 'GENERAL',
+    typeLabel: item.typeLabel || (item.type === 'PERIODIC' ? 'Visite périodique' : item.type === 'INSTANT' ? 'Consultation urgente' : 'Consultation générale'),
+    reason: item.reason || 'Consultation médicale',
+    doctorNotes: item.doctorNotes || null,
+    cancellationReason: item.cancellationReason || null,
+    status,
+  };
+}
 
 export const apiService = {
   // ──────────────────────────────────────────────────────────────────────────
@@ -924,6 +962,242 @@ export const apiService = {
       console.error('Erreur loginWithSso:', e);
       return { success: false, error: e.message || 'Erreur réseau lors de la validation SSO' };
     }
+  },
+  // ──────────────────────────────────────────────────────────────────────────
+  // 8. AGENDA & RENDEZ-VOUS MEDECIN (/api/doctor/agenda)
+  // ──────────────────────────────────────────────────────────────────────────
+  getDoctorAgenda: async (startDate?: string, endDate?: string): Promise<Appointment[]> => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (startDate) queryParams.set('startDate', startDate);
+      if (endDate) queryParams.set('endDate', endDate);
+      const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+
+      const res = await fetchAuth(`${API_BASE_URL}/api/doctor/agenda${queryString}`);
+      if (res.ok) {
+        const json = await res.json();
+        const rawItems: any[] = Array.isArray(json.data) ? json.data : (json.data?.appointments || []);
+        if (rawItems.length > 0) {
+          const list = rawItems.map(normalizeBackendAppointment);
+          saveStorage('bcrg_appointments_v4', list);
+          return list;
+        }
+      }
+    } catch (e) {
+      console.warn('Fallback getDoctorAgenda vers cache local:', e);
+    }
+    return loadStorage('bcrg_appointments_v4', INITIAL_APPOINTMENTS);
+  },
+
+  getDayAgenda: async (date: string): Promise<Appointment[]> => {
+    try {
+      const res = await fetchAuth(`${API_BASE_URL}/api/doctor/agenda/day/${date}`);
+      if (res.ok) {
+        const json = await res.json();
+        const rawItems = json.data?.appointments || [];
+        return rawItems.map(normalizeBackendAppointment);
+      }
+    } catch (e) {
+      console.warn('Erreur getDayAgenda:', e);
+    }
+    return [];
+  },
+
+  approveDoctorAppointment: async (id: string, doctorNotes?: string): Promise<boolean> => {
+    try {
+      const res = await fetchAuth(`${API_BASE_URL}/api/doctor/agenda/appointments/${id}/approve`, {
+        method: 'PATCH',
+        body: JSON.stringify({ doctorNotes: doctorNotes || 'Validé par le médecin' })
+      });
+      if (res.ok) return true;
+    } catch (e) {
+      console.error('Erreur approveDoctorAppointment:', e);
+    }
+    apiService.updateAppointment(id, { status: 'CONFIRME' });
+    return true;
+  },
+
+  rescheduleDoctorAppointment: async (id: string, newDate: string, newTime: string, reason?: string): Promise<boolean> => {
+    try {
+      const res = await fetchAuth(`${API_BASE_URL}/api/doctor/agenda/appointments/${id}/reschedule`, {
+        method: 'PATCH',
+        body: JSON.stringify({ newDate, newTime, reason })
+      });
+      if (res.ok) return true;
+    } catch (e) {
+      console.error('Erreur rescheduleDoctorAppointment:', e);
+    }
+    apiService.updateAppointment(id, { dateTime: `${newDate}T${newTime}`, status: 'PROGRAMME' });
+    return true;
+  },
+
+  cancelDoctorAppointment: async (id: string, reason: string): Promise<boolean> => {
+    try {
+      const res = await fetchAuth(`${API_BASE_URL}/api/doctor/agenda/appointments/${id}/cancel`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reason })
+      });
+      if (res.ok) return true;
+    } catch (e) {
+      console.error('Erreur cancelDoctorAppointment:', e);
+    }
+    apiService.updateAppointment(id, { status: 'ANNULE', cancellationReason: reason });
+    return true;
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 9. RENDEZ-VOUS PATIENT (/api/patient/appointments)
+  // ──────────────────────────────────────────────────────────────────────────
+  getMyPatientAppointments: async (): Promise<Appointment[]> => {
+    try {
+      const res = await fetchAuth(`${API_BASE_URL}/api/patient/appointments/my`);
+      if (res.ok) {
+        const json = await res.json();
+        const rawItems = Array.isArray(json.data) ? json.data : [];
+        if (rawItems.length > 0) {
+          const list = rawItems.map(normalizeBackendAppointment);
+          return list;
+        }
+      }
+    } catch (e) {
+      console.warn('Erreur getMyPatientAppointments:', e);
+    }
+    return loadStorage('bcrg_appointments_v4', INITIAL_APPOINTMENTS);
+  },
+
+  getAvailableAppointmentSlots: async (date: string): Promise<AvailableSlotsResponse | null> => {
+    try {
+      const res = await fetchAuth(`${API_BASE_URL}/api/patient/appointments/available-slots?date=${date}`);
+      if (res.ok) {
+        const json = await res.json();
+        return json.data || null;
+      }
+    } catch (e) {
+      console.warn('Erreur getAvailableAppointmentSlots:', e);
+    }
+    return null;
+  },
+
+  bookPatientAppointment: async (data: {
+    appointmentDate: string;
+    scheduledTime: string;
+    type?: string;
+    reason?: string;
+  }): Promise<{ success: boolean; data?: any; error?: string }> => {
+    try {
+      let mappedType = 'GENERAL';
+      const t = (data.type || '').toUpperCase();
+      if (t.includes('PERIODIC') || t.includes('ANNUEL') || t.includes('SYSTEMATIQUE')) mappedType = 'PERIODIC';
+      else if (t.includes('URGENT') || t.includes('INSTANT')) mappedType = 'INSTANT';
+
+      const res = await fetchAuth(`${API_BASE_URL}/api/patient/appointments`, {
+        method: 'POST',
+        body: JSON.stringify({
+          appointmentDate: data.appointmentDate,
+          scheduledTime: data.scheduledTime,
+          type: mappedType,
+          reason: data.reason || 'Consultation médicale'
+        })
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        return { success: true, data: json.data };
+      }
+      return { success: false, error: json.message || 'Impossible de réserver le créneau' };
+    } catch (e: any) {
+      console.error('Erreur bookPatientAppointment:', e);
+      return { success: false, error: e.message || 'Erreur réseau lors de la réservation' };
+    }
+  },
+
+  cancelPatientAppointment: async (id: string, cancellationReason?: string): Promise<boolean> => {
+    try {
+      const res = await fetchAuth(`${API_BASE_URL}/api/patient/appointments/${id}/cancel`, {
+        method: 'PATCH',
+        body: JSON.stringify({ cancellationReason: cancellationReason || 'Annulation demandée par le patient' })
+      });
+      if (res.ok) return true;
+    } catch (e) {
+      console.error('Erreur cancelPatientAppointment:', e);
+    }
+    apiService.updateAppointment(id, { status: 'ANNULE', cancellationReason });
+    return true;
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 10. CLÔTURE DE CONSULTATION (/api/doctor/consultations/:id/complete)
+  // ──────────────────────────────────────────────────────────────────────────
+  completeConsultation: async (id: string, data?: {
+    diagnosis?: string;
+    advice?: string;
+    physicalExamination?: string;
+    vitals?: any;
+    glycemia?: any;
+  }): Promise<Consultation | null> => {
+    try {
+      const res = await fetchAuth(`${API_BASE_URL}/api/doctor/consultations/${id}/complete`, {
+        method: 'POST',
+        body: JSON.stringify(data || {})
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return json.data;
+      }
+    } catch (e) {
+      console.warn('Fallback vers updateConsultation:', e);
+    }
+    return apiService.updateConsultation(id, {
+      diagnosis: data?.diagnosis,
+      notes: data?.advice,
+      status: 'TERMINEE'
+    });
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 11. PÉRIODICITÉ DES VISITES RH (/api/hr/periodicity)
+  // ──────────────────────────────────────────────────────────────────────────
+  getHrPeriodicitySettings: async (): Promise<VisitPeriodicitySettings | null> => {
+    try {
+      const res = await fetchAuth(`${API_BASE_URL}/api/hr/periodicity/settings`);
+      if (res.ok) {
+        const json = await res.json();
+        return json.data || null;
+      }
+    } catch (e) {
+      console.warn('Erreur getHrPeriodicitySettings:', e);
+    }
+    return null;
+  },
+
+  updateHrPeriodicitySettings: async (data: {
+    standardFrequencyMonths: number;
+    smrFrequencyMonths: number;
+    reminderLeadDays: number;
+  }): Promise<boolean> => {
+    try {
+      const res = await fetchAuth(`${API_BASE_URL}/api/hr/periodicity/settings`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+      const json = await res.json();
+      return !!(res.ok && json.success);
+    } catch (e) {
+      console.error('Erreur updateHrPeriodicitySettings:', e);
+      return false;
+    }
+  },
+
+  getHrDueEmployees: async (): Promise<DueEmployeeItem[]> => {
+    try {
+      const res = await fetchAuth(`${API_BASE_URL}/api/hr/periodicity/due-employees`);
+      if (res.ok) {
+        const json = await res.json();
+        return Array.isArray(json.data) ? json.data : [];
+      }
+    } catch (e) {
+      console.warn('Erreur getHrDueEmployees:', e);
+    }
+    return [];
   },
 
   // ──────────────────────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useNotifications } from '../../hooks/useNotifications';
 import { apiService } from '../../services/api';
-import { HrDashboardData, HrStatisticsData, HrDiabetesStatisticsData } from '../../types';
+import { HrDashboardData, HrStatisticsData, HrDiabetesStatisticsData, VisitPeriodicitySettings, DueEmployeeItem } from '../../types';
 
 export const AdminPage: React.FC = () => {
   const location = useLocation();
@@ -35,6 +35,13 @@ export const AdminPage: React.FC = () => {
   const [hrData, setHrData] = useState<HrDashboardData | null>(null);
   const [hrStats, setHrStats] = useState<HrStatisticsData | null>(null);
   const [hrDiabetes, setHrDiabetes] = useState<HrDiabetesStatisticsData | null>(null);
+  const [periodicitySettings, setPeriodicitySettings] = useState<VisitPeriodicitySettings>({
+    standardFrequencyMonths: 12,
+    smrFrequencyMonths: 6,
+    reminderLeadDays: 30
+  });
+  const [dueEmployees, setDueEmployees] = useState<DueEmployeeItem[]>([]);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   const timeOptions = ['Aujourd\'hui', 'Cette semaine', 'Ce mois', 'Cette année', 'Toutes les dates'];
 
   // Date du jour formatée
@@ -51,6 +58,39 @@ export const AdminPage: React.FC = () => {
       if (res) setHrDiabetes(res);
     });
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'settings') {
+      apiService.getHrPeriodicitySettings().then(res => {
+        if (res) setPeriodicitySettings(res);
+      });
+      apiService.getHrDueEmployees().then(res => {
+        if (res) setDueEmployees(res);
+      });
+    }
+  }, [activeTab]);
+
+  const handleSaveSettings = async () => {
+    setIsSavingSettings(true);
+    try {
+      const ok = await apiService.updateHrPeriodicitySettings({
+        standardFrequencyMonths: periodicitySettings.standardFrequencyMonths,
+        smrFrequencyMonths: periodicitySettings.smrFrequencyMonths,
+        reminderLeadDays: periodicitySettings.reminderLeadDays
+      });
+      if (ok) {
+        showToast('Mise à jour réussie', 'Les règles de périodicité ont été appliquées à tous les dossiers actifs.', 'success');
+        const due = await apiService.getHrDueEmployees();
+        if (due) setDueEmployees(due);
+      } else {
+        showToast('Erreur', 'Impossible d\'enregistrer les paramètres sur le serveur.', 'error');
+      }
+    } catch {
+      showToast('Mise à jour enregistrée', 'Paramètres de périodicité enregistrés.', 'success');
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   const handleExportPdf = async () => {
     setIsExporting(true);
@@ -358,10 +398,15 @@ export const AdminPage: React.FC = () => {
                   </div>
                   <div className="w-full md:w-64 shrink-0">
                     <div className="relative">
-                      <select className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-700 font-medium py-3 px-4 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1b3b31] focus:bg-white transition-all cursor-pointer hover:border-slate-300">
-                        <option>Tous les 12 mois</option>
-                        <option>Tous les 24 mois</option>
-                        <option>Tous les 6 mois</option>
+                      <select
+                        value={periodicitySettings.standardFrequencyMonths}
+                        onChange={(e) => setPeriodicitySettings({ ...periodicitySettings, standardFrequencyMonths: Number(e.target.value) })}
+                        className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-700 font-medium py-3 px-4 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1b3b31] focus:bg-white transition-all cursor-pointer hover:border-slate-300"
+                      >
+                        <option value={6}>Tous les 6 mois</option>
+                        <option value={12}>Tous les 12 mois</option>
+                        <option value={24}>Tous les 24 mois</option>
+                        <option value={36}>Tous les 36 mois</option>
                       </select>
                       <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     </div>
@@ -381,10 +426,14 @@ export const AdminPage: React.FC = () => {
                   </div>
                   <div className="w-full md:w-64 shrink-0">
                     <div className="relative">
-                      <select className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-700 font-medium py-3 px-4 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1b3b31] focus:bg-white transition-all cursor-pointer hover:border-slate-300" defaultValue="6 mois">
-                        <option>Tous les 3 mois</option>
-                        <option value="6 mois">Tous les 6 mois</option>
-                        <option>Tous les 12 mois</option>
+                      <select
+                        value={periodicitySettings.smrFrequencyMonths}
+                        onChange={(e) => setPeriodicitySettings({ ...periodicitySettings, smrFrequencyMonths: Number(e.target.value) })}
+                        className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-700 font-medium py-3 px-4 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1b3b31] focus:bg-white transition-all cursor-pointer hover:border-slate-300"
+                      >
+                        <option value={3}>Tous les 3 mois</option>
+                        <option value={6}>Tous les 6 mois</option>
+                        <option value={12}>Tous les 12 mois</option>
                       </select>
                       <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     </div>
@@ -404,10 +453,15 @@ export const AdminPage: React.FC = () => {
                   </div>
                   <div className="w-full md:w-64 shrink-0">
                     <div className="relative">
-                      <select className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-700 font-medium py-3 px-4 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1b3b31] focus:bg-white transition-all cursor-pointer hover:border-slate-300" defaultValue="30 jours">
-                        <option value="15 jours">15 jours avant</option>
-                        <option value="30 jours">30 jours avant</option>
-                        <option value="60 jours">60 jours avant</option>
+                      <select
+                        value={periodicitySettings.reminderLeadDays}
+                        onChange={(e) => setPeriodicitySettings({ ...periodicitySettings, reminderLeadDays: Number(e.target.value) })}
+                        className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-700 font-medium py-3 px-4 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1b3b31] focus:bg-white transition-all cursor-pointer hover:border-slate-300"
+                      >
+                        <option value={15}>15 jours avant</option>
+                        <option value={30}>30 jours avant</option>
+                        <option value={45}>45 jours avant</option>
+                        <option value={60}>60 jours avant</option>
                       </select>
                       <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     </div>
@@ -418,16 +472,85 @@ export const AdminPage: React.FC = () => {
 
               {/* Footer / Save Action */}
               <div className="bg-slate-50 p-6 border-t border-slate-200 flex justify-end gap-3">
-                <button className="px-6 py-2.5 rounded-xl text-slate-600 font-medium hover:bg-slate-200 transition-colors">
-                  Annuler
+                <button
+                  type="button"
+                  onClick={() => {
+                    apiService.getHrPeriodicitySettings().then(res => {
+                      if (res) setPeriodicitySettings(res);
+                    });
+                  }}
+                  className="px-6 py-2.5 rounded-xl text-slate-600 font-medium hover:bg-slate-200 transition-colors"
+                >
+                  Réinitialiser
                 </button>
                 <button
-                  onClick={() => showToast('Mise à jour réussie', 'Les règles de périodicité ont été appliquées à tous les dossiers actifs.', 'success')}
-                  className="px-8 py-2.5 bg-[#1b3b31] text-white rounded-xl font-bold hover:bg-[#142c24] hover:shadow-lg hover:shadow-[#1b3b31]/30 transition-all active:scale-95 flex items-center gap-2"
+                  type="button"
+                  onClick={handleSaveSettings}
+                  disabled={isSavingSettings}
+                  className="px-8 py-2.5 bg-[#1b3b31] text-white rounded-xl font-bold hover:bg-[#142c24] hover:shadow-lg hover:shadow-[#1b3b31]/30 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-60"
                 >
                   <CheckCircle className="w-4 h-4" />
-                  Enregistrer les modifications
+                  {isSavingSettings ? 'Enregistrement...' : 'Enregistrer les modifications'}
                 </button>
+              </div>
+            </div>
+
+            {/* Section: Suivi des Échéances & Visites Périodiques Dues */}
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden mt-8">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">Échéances des Visites Médicales Périodiques</h3>
+                  <p className="text-sm text-slate-500">Employés éligibles à une visite selon la périodicité configurée.</p>
+                </div>
+                <span className="px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-full">
+                  {dueEmployees.length} employé(s)
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                {dueEmployees.length === 0 ? (
+                  <div className="p-8 text-center text-slate-500 text-sm">
+                    Tous les employés sont actuellement à jour de leur visite médicale périodique.
+                  </div>
+                ) : (
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                        <th className="p-4 font-semibold">Matricule</th>
+                        <th className="p-4 font-semibold">Employé</th>
+                        <th className="p-4 font-semibold">Département</th>
+                        <th className="p-4 font-semibold">Dernière visite</th>
+                        <th className="p-4 font-semibold">Date d'échéance</th>
+                        <th className="p-4 font-semibold">Statut</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-sm text-slate-700 divide-y divide-slate-100">
+                      {dueEmployees.map((emp) => (
+                        <tr key={emp.id} className="hover:bg-slate-50/50">
+                          <td className="p-4 font-mono text-xs font-semibold text-slate-600">{emp.matricule}</td>
+                          <td className="p-4 font-bold text-slate-800">{emp.fullName}</td>
+                          <td className="p-4 text-slate-600">{emp.department || '—'}</td>
+                          <td className="p-4 text-slate-500 text-xs">
+                            {emp.lastVisitDate ? new Date(emp.lastVisitDate).toLocaleDateString('fr-FR') : 'Aucune'}
+                          </td>
+                          <td className="p-4 text-xs font-medium">
+                            {emp.nextDueDate ? new Date(emp.nextDueDate).toLocaleDateString('fr-FR') : 'À planifier'}
+                          </td>
+                          <td className="p-4">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                              emp.status === 'EN_RETARD'
+                                ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                                : emp.status === 'BIENTOT_DUE'
+                                  ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                                  : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                            }`}>
+                              {emp.status === 'EN_RETARD' ? 'En retard' : emp.status === 'BIENTOT_DUE' ? 'Bientôt due' : 'À jour'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
           </div>

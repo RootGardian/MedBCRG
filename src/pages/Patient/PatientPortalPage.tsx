@@ -23,13 +23,26 @@ export const PatientPortalPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const loadPatientAppointments = async () => {
+    try {
+      const apts = await apiService.getMyPatientAppointments();
+      if (apts && apts.length > 0) {
+        setAppointments(apts);
+      } else {
+        const local = apiService.getAppointments();
+        setAppointments(local);
+      }
+    } catch {
+      setAppointments(apiService.getAppointments());
+    }
+  };
+
   useEffect(() => {
     if (location.pathname === '/patient/renouvellement') {
       setIsRenewPrescriptionPanelOpen(true);
     }
-    // Fetch patient appointments
-    const allApts = apiService.getAppointments();
-    setAppointments(allApts);
+    // Fetch patient appointments from backend API
+    loadPatientAppointments();
 
     // Fetch real patient vitals and documents from backend
     apiService.getMyVitals().then(res => {
@@ -500,10 +513,14 @@ export const PatientPortalPage: React.FC = () => {
                 Non, conserver
               </button>
               <button
-                onClick={() => {
-                  apiService.updateAppointment(appointmentToCancel, { status: 'ANNULE' });
-                  const updatedApts = apiService.getAppointments();
-                  setAppointments(updatedApts.filter(a => a.patientId === 'PAT-002'));
+                onClick={async () => {
+                  try {
+                    await apiService.cancelPatientAppointment(appointmentToCancel, "Annulé par le patient");
+                    showToast('Rendez-vous annulé', 'Votre rendez-vous a bien été annulé.', 'info');
+                  } catch (e) {
+                    apiService.updateAppointment(appointmentToCancel, { status: 'ANNULE' });
+                  }
+                  await loadPatientAppointments();
                   setAppointmentToCancel(null);
                 }}
                 className="flex-1 px-4 py-3 bg-rose-600 text-white rounded-xl font-medium hover:bg-rose-700 transition-colors shadow-sm"

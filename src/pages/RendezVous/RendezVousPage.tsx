@@ -21,8 +21,22 @@ export const RendezVousPage: React.FC = () => {
   // Reschedule Modal State
   const [rescheduleAptId, setRescheduleAptId] = useState<string | null>(null);
 
+  const [isLoading, setIsLoading] = useState(false);
+
+  const loadAgenda = async () => {
+    setIsLoading(true);
+    try {
+      const data = await apiService.getDoctorAgenda();
+      setAppointments(data);
+    } catch (e) {
+      setAppointments(apiService.getAppointments());
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    setAppointments(apiService.getAppointments());
+    loadAgenda();
   }, []);
 
   const handlePrev = () => {
@@ -66,16 +80,27 @@ export const RendezVousPage: React.FC = () => {
     }).sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
   };
 
-  const updateAppointmentStatus = (id: string, newStatus: Appointment['status']) => {
-    apiService.updateAppointment(id, { status: newStatus });
-    setAppointments(apiService.getAppointments());
+  const updateAppointmentStatus = async (id: string, newStatus: Appointment['status']) => {
+    try {
+      if (newStatus === 'CONFIRME') {
+        await apiService.approveDoctorAppointment(id);
+      } else if (newStatus === 'ANNULE') {
+        await apiService.cancelDoctorAppointment(id, 'Annulé par le praticien');
+      } else {
+        apiService.updateAppointment(id, { status: newStatus });
+      }
+    } catch (e) {
+      console.warn('Fallback updateAppointment:', e);
+      apiService.updateAppointment(id, { status: newStatus });
+    }
+    await loadAgenda();
   };
 
   const handleReschedule = (id: string) => {
     setRescheduleAptId(id);
   };
 
-  const submitReschedule = (e: React.FormEvent<HTMLFormElement>) => {
+  const submitReschedule = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!rescheduleAptId) return;
     const formData = new FormData(e.currentTarget);
@@ -83,9 +108,14 @@ export const RendezVousPage: React.FC = () => {
     const timeStr = formData.get('time') as string;
     
     if (dateStr && timeStr) {
-      const newDateTime = `${dateStr}T${timeStr}`;
-      apiService.updateAppointment(rescheduleAptId, { dateTime: newDateTime, status: 'PROGRAMME' });
-      setAppointments(apiService.getAppointments());
+      try {
+        await apiService.rescheduleDoctorAppointment(rescheduleAptId, dateStr, timeStr);
+      } catch (e) {
+        console.warn('Fallback reschedule:', e);
+        const newDateTime = `${dateStr}T${timeStr}`;
+        apiService.updateAppointment(rescheduleAptId, { dateTime: newDateTime, status: 'PROGRAMME' });
+      }
+      await loadAgenda();
       setRescheduleAptId(null);
     }
   };
@@ -386,20 +416,47 @@ export const RendezVousPage: React.FC = () => {
 
                     {/* Actions if PROGRAMME */}
                     {apt.status === 'PROGRAMME' && (
+                      <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 mt-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => updateAppointmentStatus(apt.id, 'CONFIRME')}
+                            className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-lg text-sm font-medium transition-colors"
+                          >
+                            <Check className="w-4 h-4" />
+                            Approuver
+                          </button>
+                          <button
+                            onClick={() => handleReschedule(apt.id)}
+                            className="flex-1 flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-sm font-medium transition-colors"
+                          >
+                            <Clock className="w-4 h-4 text-slate-400" />
+                            Reprogrammer
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => updateAppointmentStatus(apt.id, 'ANNULE')}
+                          className="w-full flex items-center justify-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          Refuser la demande
+                        </button>
+                      </div>
+                    )}
+                    {apt.status === 'CONFIRME' && (
                       <div className="flex gap-2 pt-2 border-t border-slate-100 mt-2">
                         <button
-                          onClick={() => updateAppointmentStatus(apt.id, 'CONFIRME')}
-                          className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-lg text-sm font-medium transition-colors"
+                          onClick={() => handleReschedule(apt.id)}
+                          className="flex-1 flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-xs font-medium transition-colors"
                         >
-                          <Check className="w-4 h-4" />
-                          Approuver
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          Reprogrammer
                         </button>
                         <button
-                          onClick={() => handleReschedule(apt.id)}
-                          className="flex-1 flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-sm font-medium transition-colors"
+                          onClick={() => updateAppointmentStatus(apt.id, 'ANNULE')}
+                          className="flex-1 flex items-center justify-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 py-2 rounded-lg text-xs font-medium transition-colors"
                         >
-                          <Clock className="w-4 h-4 text-slate-400" />
-                          Reprogrammer
+                          <X className="w-3.5 h-3.5" />
+                          Annuler
                         </button>
                       </div>
                     )}
