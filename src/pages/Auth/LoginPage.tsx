@@ -117,20 +117,6 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  if (isSsoAuthenticating) {
-    return (
-      <div className="min-h-screen flex w-full items-center justify-center bg-slate-50">
-        <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-xl text-center space-y-4 border border-slate-100 animate-in fade-in">
-          <div className="w-12 h-12 border-4 border-[#1b3b31]/20 border-t-[#1b3b31] rounded-full animate-spin mx-auto" />
-          <h3 className="text-lg font-bold text-slate-800">Validation SSO BCRG HUB...</h3>
-          <p className="text-xs text-slate-500">
-            Authentification fédérée et sécurisation de votre session médicale en cours.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex w-full">
       {/* Left Panel - Branding */}
@@ -152,23 +138,62 @@ export const LoginPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Right Panel - Login Form */}
+      {/* Right Panel */}
       <div className="w-full lg:w-1/2 bg-white flex flex-col items-center justify-between relative px-8 sm:px-16 py-12 lg:py-0 overflow-y-auto h-screen">
-        <div className="w-full max-w-md my-auto">
-          {/* Mobile Logo (hidden on desktop) */}
-          <div className="lg:hidden flex flex-col items-center mb-10">
-            <div className="p-2 bg-[#1b3b31] rounded-[1.5rem] mb-4 shadow-lg overflow-hidden inline-flex">
-              <img src={medLogo} alt="MedBCRG Logo" className="w-24 rounded-[1rem]" />
+        {isSsoAuthenticating ? (
+          <div className="w-full max-w-md my-auto animate-in fade-in duration-300">
+            {/* Mobile Logo (hidden on desktop) */}
+            <div className="lg:hidden flex flex-col items-center mb-10">
+              <div className="p-2 bg-[#1b3b31] rounded-[1.5rem] mb-4 shadow-lg overflow-hidden inline-flex">
+                <img src={medLogo} alt="MedBCRG Logo" className="w-24 rounded-[1rem]" />
+              </div>
+              <h1 className="text-4xl font-extrabold text-[#1b3b31] tracking-tight">MedBCRG</h1>
             </div>
-            <h1 className="text-4xl font-extrabold text-[#1b3b31] tracking-tight">MedBCRG</h1>
-          </div>
 
-          <div className="mb-8 text-left">
-            <h2 className="text-2xl font-extrabold text-slate-800 mb-2">Connexion</h2>
-            <p className="text-slate-500 text-xs">
-              Connectez-vous via le portail unique <strong>BCRG HUB</strong> ou vos identifiants internes.
-            </p>
+            {/* SSO Transition Loading Card */}
+            <div className="w-full p-8 sm:p-10 bg-white rounded-3xl shadow-xl shadow-slate-200/50 text-center space-y-6 border border-slate-100">
+              <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border-4 border-[#1b3b31]/10 animate-ping opacity-25" />
+                <div className="w-16 h-16 border-4 border-[#1b3b31]/20 border-t-[#1b3b31] rounded-full animate-spin" />
+                <Globe className="w-7 h-7 text-[#1b3b31] absolute" />
+              </div>
+              
+              <div>
+                <h3 className="text-2xl font-extrabold text-slate-800 tracking-tight">
+                  Validation SSO BCRG HUB...
+                </h3>
+                <p className="text-sm text-slate-500 mt-2 leading-relaxed">
+                  Authentification fédérée et sécurisation de votre session médicale en cours.
+                </p>
+              </div>
+
+              {/* Step indicator */}
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-xs text-slate-600 flex items-center justify-center gap-3">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-medium">Échange du jeton d'autorisation en cours...</span>
+              </div>
+
+              <div className="pt-2 text-[11px] text-slate-400">
+                Centre Médical de la Banque Centrale de la République de Guinée
+              </div>
+            </div>
           </div>
+        ) : (
+          <div className="w-full max-w-md my-auto">
+            {/* Mobile Logo (hidden on desktop) */}
+            <div className="lg:hidden flex flex-col items-center mb-10">
+              <div className="p-2 bg-[#1b3b31] rounded-[1.5rem] mb-4 shadow-lg overflow-hidden inline-flex">
+                <img src={medLogo} alt="MedBCRG Logo" className="w-24 rounded-[1rem]" />
+              </div>
+              <h1 className="text-4xl font-extrabold text-[#1b3b31] tracking-tight">MedBCRG</h1>
+            </div>
+
+            <div className="mb-8 text-left">
+              <h2 className="text-2xl font-extrabold text-slate-800 mb-2">Connexion</h2>
+              <p className="text-slate-500 text-xs">
+                Connectez-vous via le portail unique <strong>BCRG HUB</strong> ou vos identifiants internes.
+              </p>
+            </div>
 
           {/* Alerte Erreur SSO */}
           {ssoError && (
@@ -267,6 +292,7 @@ export const LoginPage: React.FC = () => {
             </button>
           </form>
         </div>
+        )}
 
         {/* Footer */}
         <p className="text-xs text-slate-400 text-center w-full mt-8">
