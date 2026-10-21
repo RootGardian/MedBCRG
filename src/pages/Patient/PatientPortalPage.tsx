@@ -2,17 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { CalendarDays, Bell, Activity, Plus, Clock, FileText, MoreHorizontal, X, Eye, Download, ShieldCheck, RefreshCw, Upload } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { formatDate } from '../../utils/formatters';
-import { apiService } from '../../services/api';
-import { Appointment } from '../../types';
+import { apiService, viewDocumentBlob, downloadDocumentBlob } from '../../services/api';
+import { Appointment, MedicalDocument, PatientVitalsResponse } from '../../types';
 import { Badge } from '../../components/common/Badge';
+import { useNotifications } from '../../hooks/useNotifications';
 
 export const PatientPortalPage: React.FC = () => {
+  const { showToast } = useNotifications();
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const [openDocument, setOpenDocument] = useState<{ id: string, title: string, date: string, type: string, hasFile?: boolean } | null>(null);
+  const [openDocument, setOpenDocument] = useState<MedicalDocument | null>(null);
   const [isAllDocumentsOpen, setIsAllDocumentsOpen] = useState(false);
   const [isAppointmentPanelOpen, setIsAppointmentPanelOpen] = useState(false);
   const [isRenewPrescriptionPanelOpen, setIsRenewPrescriptionPanelOpen] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [documents, setDocuments] = useState<MedicalDocument[]>([]);
+  const [vitalsData, setVitalsData] = useState<PatientVitalsResponse | null>(null);
   const [successModal, setSuccessModal] = useState<{isOpen: boolean, message: string}>({isOpen: false, message: ''});
   const [appointmentToCancel, setAppointmentToCancel] = useState<string | null>(null);
 
@@ -25,18 +29,22 @@ export const PatientPortalPage: React.FC = () => {
     }
     // Fetch patient appointments
     const allApts = apiService.getAppointments();
-    setAppointments(allApts.filter(a => a.patientId === 'PAT-002'));
+    setAppointments(allApts);
+
+    // Fetch real patient vitals and documents from backend
+    apiService.getMyVitals().then(res => {
+      if (res) setVitalsData(res);
+    });
+
+    apiService.getMyDocuments().then(res => {
+      if (res) setDocuments(res);
+    });
   }, [location.pathname, isAppointmentPanelOpen]);
 
   const handleCloseRenew = () => {
     setIsRenewPrescriptionPanelOpen(false);
     if (location.pathname !== '/patient') navigate('/patient');
   };
-
-  const documents = [
-    { id: '1', title: 'Ordonnance', date: '15 Juin 2026', type: 'Consultation Suivi', doctor: 'Dr. Ousmane Bangoura', hasAction: true, hasFile: true },
-    { id: '2', title: 'Compte Rendu', date: '10 Janv 2026', type: 'Visite Annuelle', doctor: 'Dr. Ousmane Bangoura', hasAction: false, hasFile: false },
-  ];
 
   return (
     <div className="space-y-6 relative animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -64,15 +72,13 @@ export const PatientPortalPage: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Rappels / Notifications */}
-        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 md:col-span-3 flex items-start gap-4">
-          <div className="p-3 bg-amber-100 rounded-lg text-amber-600 shrink-0">
+        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 md:col-span-3 flex items-start gap-4">
+          <div className="p-3 bg-slate-100 rounded-lg text-slate-500 shrink-0">
             <Bell className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="font-semibold text-amber-800">Visite médicale obligatoire</h3>
-            <p className="text-sm text-amber-700 mt-1">
-              Votre visite médicale annuelle est prévue pour le mois prochain. Pensez à prendre rendez-vous avant le 15 Octobre.
-            </p>
+            <h3 className="font-semibold text-slate-600">Aucune notification</h3>
+            <p className="text-sm text-slate-500 mt-1">Vous n'avez pas de nouveaux rappels ou messages.</p>
           </div>
         </div>
 
@@ -139,15 +145,17 @@ export const PatientPortalPage: React.FC = () => {
           <div className="space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
               <span className="text-sm text-slate-500">Tension Artérielle</span>
-              <span className="font-semibold text-slate-800">120/80</span>
+              <span className="font-semibold text-slate-800">{vitalsData?.summary?.bloodPressure || '-'}</span>
             </div>
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
               <span className="text-sm text-slate-500">Poids</span>
-              <span className="font-semibold text-slate-800">75 kg</span>
+              <span className="font-semibold text-slate-800">{vitalsData?.summary?.weightKg ? `${vitalsData.summary.weightKg} kg` : '-'}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-500">Dernière visite</span>
-              <span className="font-semibold text-slate-800 text-sm">15 Juin 2026</span>
+              <span className="text-sm text-slate-500">Dernière mesure</span>
+              <span className="font-semibold text-slate-800 text-sm">
+                {vitalsData?.summary?.measuredAt ? formatDate(vitalsData.summary.measuredAt) : '-'}
+              </span>
             </div>
           </div>
         </div>
@@ -160,50 +168,53 @@ export const PatientPortalPage: React.FC = () => {
               <h2 className="font-semibold text-slate-800">Suivi et Documents</h2>
             </div>
             <div className="flex items-center gap-3">
-              <button onClick={() => setIsAllDocumentsOpen(true)} className="text-sm text-[#1b3b31] font-medium hover:underline">Voir tout</button>
+              <button onClick={() => navigate('/patient/documents')} className="text-sm text-[#1b3b31] font-medium hover:underline">+ Ajouter un document</button>
             </div>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
-            {documents.map((doc) => (
-              <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${doc.title === 'Ordonnance' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
-                    <FileText className="w-5 h-5" />
+            {documents.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">
+                <FileText className="w-10 h-10 mx-auto mb-2 text-slate-200" />
+                <p className="text-sm">Aucun document médical disponible pour le moment.</p>
+              </div>
+            ) : (
+              documents.map((doc) => (
+                <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-emerald-50 text-emerald-600">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">{doc.title}</p>
+                      <p className="text-xs text-slate-500">
+                        {doc.documentType} • {formatDate(doc.createdAt)}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">{doc.title} - {doc.date}</p>
-                    <p className="text-xs text-slate-500">
-                      {doc.hasFile ? 'Document PDF • Généré automatiquement' : `${doc.type} • ${doc.doctor}`}
-                    </p>
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  {doc.hasAction ? (
-                    <>
+                  <div className="flex items-center gap-2">
+                    {doc.viewUrl && (
                       <button
-                        onClick={() => setOpenDocument(doc)}
+                        onClick={() => viewDocumentBlob(doc.viewUrl!)}
                         className="p-2 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
                         title="Prévisualiser"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      {doc.hasFile && (
-                        <button
-                          onClick={() => { }}
-                          className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                          title="Télécharger"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-xs text-slate-400 italic pr-2">Non disponible</span>
-                  )}
+                    )}
+                    {doc.downloadUrl && (
+                      <button
+                        onClick={() => downloadDocumentBlob(doc.downloadUrl!, `${doc.title}.pdf`)}
+                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                        title="Télécharger"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -221,7 +232,7 @@ export const PatientPortalPage: React.FC = () => {
                   </div>
                   <div>
                     <h2 className="text-lg font-bold">{openDocument.title}</h2>
-                    <p className="text-white/70 text-sm">{openDocument.date}</p>
+                    <p className="text-white/70 text-sm">{formatDate(openDocument.createdAt)}</p>
                   </div>
                 </div>
               </div>
@@ -234,13 +245,27 @@ export const PatientPortalPage: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center justify-center text-center text-slate-500">
               <FileText className="w-16 h-16 text-slate-200 mb-4" />
               <p className="mb-2 font-medium text-slate-700">Aperçu du document PDF</p>
-              <p className="text-sm max-w-[250px] mb-6">Ce document est disponible en lecture seule{openDocument.hasFile && ' ou en téléchargement'}.</p>
-              {openDocument.hasFile && (
-                <button className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2 px-6 rounded-lg flex items-center gap-2 transition-colors">
-                  <Download className="w-4 h-4" />
-                  Télécharger le PDF
-                </button>
-              )}
+              <p className="text-sm max-w-[250px] mb-6">Ce document est disponible en lecture seule{openDocument.downloadUrl ? ' ou en téléchargement.' : '.'}</p>
+              <div className="flex flex-col gap-2">
+                {openDocument.viewUrl && (
+                  <button
+                    onClick={() => viewDocumentBlob(openDocument.viewUrl!)}
+                    className="bg-[#1b3b31] hover:bg-[#142c24] text-white font-medium py-2 px-6 rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    <Eye className="w-4 h-4" />
+                    Ouvrir dans l'onglet
+                  </button>
+                )}
+                {openDocument.downloadUrl && (
+                  <button
+                    onClick={() => downloadDocumentBlob(openDocument.downloadUrl!, `${openDocument.title}.pdf`)}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2 px-6 rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Télécharger le document
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -267,41 +292,38 @@ export const PatientPortalPage: React.FC = () => {
                 {documents.map((doc) => (
                   <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${doc.title === 'Ordonnance' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${doc.title.toLowerCase().includes('ordonnance') ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
                         <FileText className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-slate-800">{doc.title} - {doc.date}</p>
+                        <p className="text-sm font-bold text-slate-800">{doc.title}</p>
                         <p className="text-xs text-slate-500">
-                          {doc.hasFile ? 'Document PDF • Généré automatiquement' : `${doc.type} • ${doc.doctor}`}
+                          {doc.documentType} • {formatDate(doc.createdAt)}
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {doc.hasAction ? (
-                        <>
-                          <button
-                            onClick={() => {
-                              setIsAllDocumentsOpen(false);
-                              setOpenDocument(doc);
-                            }}
-                            className="p-2 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
-                            title="Prévisualiser"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          {doc.hasFile && (
-                            <button
-                              className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                              title="Télécharger"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-xs text-slate-400 italic pr-2">Non disponible</span>
+                      {doc.viewUrl && (
+                        <button
+                          onClick={() => {
+                            setIsAllDocumentsOpen(false);
+                            viewDocumentBlob(doc.viewUrl!);
+                          }}
+                          className="p-2 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
+                          title="Prévisualiser"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      )}
+                      {doc.downloadUrl && (
+                        <button
+                          onClick={() => downloadDocumentBlob(doc.downloadUrl!, `${doc.title}.pdf`)}
+                          className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                          title="Télécharger"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
                       )}
                     </div>
                   </div>

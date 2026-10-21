@@ -16,11 +16,10 @@ export const PATIENT_CATEGORIES_LABEL = {
   STAGIAIRE: 'Stagiaire / Prestataire',
 };
 
-export const CONSULTATION_TYPES_LABEL = {
+export const CONSULTATION_TYPES_LABEL: Record<string, string> = {
   GENERAL: 'Consultation Générale',
-  URGENCE: 'Urgence Médicale',
-  SUIVI: 'Visite de Suivi / Contrôle',
-  VISITE_EMBAUCHE: "Visite d'embauche / Aptitude",
+  INSTANT: 'Urgence Médicale',
+  PERIODIC: 'Visite de Suivi / Contrôle',
 };
 
 export const APPOINTMENT_STATUS_COLOR = {

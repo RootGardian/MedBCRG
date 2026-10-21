@@ -1,39 +1,15 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { User } from '../types';
+import { User, UserRole } from '../types';
 
 interface AuthContextType {
   user: User | null;
-  login: (role?: string) => void;
+  login: (matricule: string, password: string) => Promise<{ success: boolean; role?: string; isFirstLogin?: boolean; error?: string }>;
+  loginWithSso: (ssoToken: string) => Promise<{ success: boolean; role?: string; error?: string }>;
   logout: () => void;
   isAuthenticated: boolean;
 }
 
-const MOCK_USER: User = {
-  id: 'USR-BCRG-01',
-  name: 'Dr. Ousmane Bangoura',
-  email: 'o.bangoura@bcrg-guinee.org',
-  role: 'MEDECIN',
-  title: 'Médecin Chef d\'Infirmerie',
-  avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80',
-};
-
-const MOCK_ADMIN: User = {
-  id: 'USR-BCRG-ADMIN',
-  name: 'Admin BCRG',
-  email: 'admin@bcrg-guinee.org',
-  role: 'ADMIN' as any,
-  title: 'Administrateur / RH',
-  avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-};
-
-const MOCK_PATIENT: User = {
-  id: 'USR-BCRG-PATIENT',
-  name: 'Employé Patient',
-  email: 'patient@bcrg-guinee.org',
-  role: 'PATIENT' as any,
-  title: 'Employé BCRG',
-  avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-};
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://backend-med-bcrg.onrender.com';
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -48,19 +24,152 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       sessionStorage.setItem('bcrg_auth_user', JSON.stringify(user));
     } else {
       sessionStorage.removeItem('bcrg_auth_user');
+      sessionStorage.removeItem('bcrg_access_token');
     }
   }, [user]);
 
-  const login = (role = 'MEDECIN') => {
-    if (role === 'ADMIN') {
-      setUser(MOCK_ADMIN);
-    } else if (role === 'PATIENT') {
-      setUser(MOCK_PATIENT);
-    } else {
-      setUser({
-        ...MOCK_USER,
-        role: role as any,
+  const login = async (matricule: string, password: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matricule, password })
       });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        const userData = data.data.user;
+        const tokens = data.data.tokens;
+        
+        sessionStorage.setItem('bcrg_access_token', tokens.accessToken);
+        
+        let phone = userData.phone || '';
+        let jobTitle = userData.jobTitle || '';
+        const matriculeValue = userData.matricule || matricule;
+
+        // Fetch /api/auth/me to get additional fields (phone, job title, etc.) if available
+        try {
+          const meRes = await fetch(`${API_BASE_URL}/api/auth/me`, {
+            headers: {
+              'Authorization': `Bearer ${tokens.accessToken}`
+            }
+          });
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            const meUser = meData.data?.user || meData.data;
+            if (meUser) {
+              if (meUser.phone) phone = meUser.phone;
+              if (meUser.jobTitle) jobTitle = meUser.jobTitle;
+            }
+          }
+        } catch (e) {
+          console.warn('Could not fetch user profile details:', e);
+        }
+
+        let mappedRole: UserRole = 'PATIENT';
+        const rawRole = (userData.role || '').toUpperCase();
+        if (rawRole === 'DOCTOR' || rawRole === 'MEDECIN') {
+          mappedRole = 'MEDECIN';
+        } else if (rawRole === 'HR' || rawRole === 'ADMIN') {
+          mappedRole = 'ADMIN';
+        } else {
+          mappedRole = 'PATIENT';
+        }
+
+        const mappedUser: User = {
+          id: userData.id,
+          name: `${userData.firstName} ${userData.lastName}`,
+          email: userData.email,
+          role: mappedRole,
+          title: mappedRole === 'ADMIN' ? 'Administrateur (RH)' : mappedRole === 'MEDECIN' ? 'Médecin' : 'Patient',
+          avatar: 'https://ui-avatars.com/api/?name=' + userData.firstName + '+' + userData.lastName + '&background=1b3b31&color=fff',
+          matricule: matriculeValue,
+          phone: phone,
+          jobTitle: jobTitle || (mappedRole === 'ADMIN' ? 'Responsable RH' : undefined),
+        };
+        
+        setUser(mappedUser);
+        return { success: true, role: mappedUser.role, isFirstLogin: userData.isFirstLogin };
+      } else {
+        return { success: false, error: data.message || 'Identifiants incorrects' };
+      }
+    } catch (err) {
+      return { success: false, error: 'Erreur de connexion au serveur' };
+    }
+  };
+
+  /**
+   * Connexion Single Sign-On (SSO) fédérée via le BCRG HUB.
+   */
+  const loginWithSso = async (ssoToken: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/sso-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sso_token: ssoToken.trim() })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        const userData = data.data.user;
+        const tokens = data.data.tokens;
+
+        sessionStorage.setItem('bcrg_access_token', tokens.accessToken);
+
+        let phone = userData.phone || '';
+        let jobTitle = userData.jobTitle || '';
+        const matriculeValue = userData.matricule || '';
+
+        // Tenter de récupérer les informations détaillées si besoin
+        try {
+          const meRes = await fetch(`${API_BASE_URL}/api/auth/me`, {
+            headers: {
+              'Authorization': `Bearer ${tokens.accessToken}`
+            }
+          });
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            const meUser = meData.data?.user || meData.data;
+            if (meUser) {
+              if (meUser.phone) phone = meUser.phone;
+              if (meUser.jobTitle) jobTitle = meUser.jobTitle;
+            }
+          }
+        } catch (e) {
+          console.warn('Could not fetch user profile details:', e);
+        }
+
+        let mappedRole: UserRole = 'PATIENT';
+        const rawRole = (userData.role || '').toUpperCase();
+        if (rawRole === 'DOCTOR' || rawRole === 'MEDECIN') {
+          mappedRole = 'MEDECIN';
+        } else if (rawRole === 'HR' || rawRole === 'ADMIN') {
+          mappedRole = 'ADMIN';
+        } else {
+          mappedRole = 'PATIENT';
+        }
+
+        const mappedUser: User = {
+          id: userData.id,
+          name: `${userData.firstName} ${userData.lastName}`,
+          email: userData.email,
+          role: mappedRole,
+          title: mappedRole === 'ADMIN' ? 'Administrateur (RH)' : mappedRole === 'MEDECIN' ? 'Médecin' : 'Patient',
+          avatar: 'https://ui-avatars.com/api/?name=' + userData.firstName + '+' + userData.lastName + '&background=1b3b31&color=fff',
+          matricule: matriculeValue,
+          phone: phone,
+          jobTitle: jobTitle || (mappedRole === 'ADMIN' ? 'Responsable RH' : undefined),
+        };
+
+        setUser(mappedUser);
+        return { success: true, role: mappedUser.role };
+      } else {
+        return { success: false, error: data.message || 'Échec de validation du jeton SSO' };
+      }
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Erreur lors de la validation du jeton SSO auprès du serveur' };
     }
   };
 
@@ -73,6 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         login,
+        loginWithSso,
         logout,
         isAuthenticated: !!user,
       }}

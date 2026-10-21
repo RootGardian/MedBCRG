@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-
   Search, Upload, UserPlus, Users, X, Shield, Eye,
   Lock, Unlock, Trash2, Edit2, MoreHorizontal, Download,
   Filter, CheckCircle, Clock, AlertTriangle, Calendar
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useNotifications } from '../../hooks/useNotifications';
+import { apiService } from '../../services/api';
 
 // ───── TYPES ────────────────────────────────────────────────────────────────
 type EmployeeRole = 'PATIENT' | 'MEDECIN' | 'ADMIN' | 'RH';
@@ -29,26 +30,15 @@ interface Employee {
   nextVisit: string | null;
   visiteStatus: VisiteStatus;
   createdAt: string;
+  bloodGroup?: string;
 }
-
-// ───── MOCK DATA ─────────────────────────────────────────────────────────────
-const MOCK_EMPLOYEES: Employee[] = [
-  { id: '1', matricule: 'BCRG-2001', firstName: 'Amadou', lastName: 'Diallo', gender: 'M', email: 'a.diallo@bcrg-guinee.org', phone: '620 11 22 33', department: 'Direction des Ressources Humaines', poste: 'Chargé RH', role: 'PATIENT', status: 'ACTIF', dateEmbauche: '2018-03-15', lastVisit: '2026-03-10', nextVisit: '2026-09-10', visiteStatus: 'EN_RETARD', createdAt: '2024-01-10' },
-  { id: '2', matricule: 'BCRG-2002', firstName: 'Fatoumata', lastName: 'Camara', gender: 'F', email: 'f.camara@bcrg-guinee.org', phone: '621 44 55 66', department: 'Direction de l\'Émission', poste: 'Caissière Principale', role: 'PATIENT', status: 'ACTIF', dateEmbauche: '2015-07-01', lastVisit: '2026-07-20', nextVisit: '2027-01-20', visiteStatus: 'A_JOUR', createdAt: '2024-01-10' },
-  { id: '3', matricule: 'BCRG-2003', firstName: 'Mamadou', lastName: 'Kouyaté', gender: 'M', email: 'm.kouyate@bcrg-guinee.org', phone: '622 77 88 99', department: 'Direction Informatique (DSI)', poste: 'Développeur Senior', role: 'PATIENT', status: 'ACTIF', dateEmbauche: '2020-01-08', lastVisit: null, nextVisit: '2026-10-15', visiteStatus: 'BIENTOT_DUE', createdAt: '2024-01-10' },
-  { id: '4', matricule: 'BCRG-2004', firstName: 'Mariam', lastName: 'Bah', gender: 'F', email: 'm.bah@bcrg-guinee.org', phone: '623 00 11 22', department: 'Direction Générale', poste: 'Assistante de Direction', role: 'PATIENT', status: 'ACTIF', dateEmbauche: '2012-11-20', lastVisit: '2026-05-05', nextVisit: '2026-11-05', visiteStatus: 'A_JOUR', createdAt: '2024-01-10' },
-  { id: '5', matricule: 'BCRG-2005', firstName: 'Ibrahima', lastName: 'Sow', gender: 'M', email: 'i.sow@bcrg-guinee.org', phone: '624 33 44 55', department: 'Direction du Trésor', poste: 'Analyste Financier', role: 'PATIENT', status: 'SUSPENDU', dateEmbauche: '2019-06-14', lastVisit: '2025-12-01', nextVisit: '2026-06-01', visiteStatus: 'EN_RETARD', createdAt: '2024-01-10' },
-  { id: '6', matricule: 'BCRG-2006', firstName: 'Aissatou', lastName: 'Barry', gender: 'F', email: 'a.barry@bcrg-guinee.org', phone: '625 66 77 88', department: 'Infirmerie', poste: 'Infirmière Principale', role: 'PATIENT', status: 'ACTIF', dateEmbauche: '2016-04-03', lastVisit: '2026-08-01', nextVisit: '2027-02-01', visiteStatus: 'A_JOUR', createdAt: '2024-01-10' },
-  { id: '7', matricule: 'BCRG-2007', firstName: 'Ousmane', lastName: 'Bangoura', gender: 'M', email: 'o.bangoura@bcrg-guinee.org', phone: '626 99 00 11', department: 'Infirmerie', poste: 'Médecin Chef', role: 'MEDECIN', status: 'ACTIF', dateEmbauche: '2010-09-01', lastVisit: '2026-09-01', nextVisit: '2027-03-01', visiteStatus: 'A_JOUR', createdAt: '2024-01-10' },
-  { id: '8', matricule: 'BCRG-2008', firstName: 'Kadiatou', lastName: 'Condé', gender: 'F', email: 'k.conde@bcrg-guinee.org', phone: '627 22 33 44', department: 'Direction de la Communication', poste: 'Responsable Communication', role: 'PATIENT', status: 'INACTIF', dateEmbauche: '2017-02-28', lastVisit: null, nextVisit: null, visiteStatus: 'EN_RETARD', createdAt: '2024-01-10' },
-];
 
 // ───── HELPERS ───────────────────────────────────────────────────────────────
 const ROLE_LABELS: Record<EmployeeRole, string> = {
   PATIENT: 'Employé (Patient)',
   MEDECIN: 'Médecin',
-  ADMIN: 'Administrateur',
-  RH: 'Ressources Humaines',
+  ADMIN: 'Administrateur (RH)',
+  RH: 'Administrateur (RH)',
 };
 
 const ROLE_COLORS: Record<EmployeeRole, string> = {
@@ -70,13 +60,14 @@ const VISITE_CONFIG: Record<VisiteStatus, { label: string; color: string; icon: 
   BIENTOT_DUE: { label: 'Bientôt due', color: 'bg-amber-50 text-amber-700', icon: <Clock className="w-3.5 h-3.5" /> },
 };
 
-const DEPARTMENTS = [...new Set(MOCK_EMPLOYEES.map(e => e.department))];
 const ROLES: EmployeeRole[] = ['PATIENT', 'MEDECIN', 'ADMIN', 'RH'];
 const STATUSES: EmployeeStatus[] = ['ACTIF', 'INACTIF', 'SUSPENDU'];
 
 // ───── COMPONENT ─────────────────────────────────────────────────────────────
 export const UsersManagementPage: React.FC = () => {
-  const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
+  const { showToast } = useNotifications();
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState<EmployeeRole | 'ALL'>('ALL');
   const [filterStatus, setFilterStatus] = useState<EmployeeStatus | 'ALL'>('ALL');
@@ -87,10 +78,74 @@ export const UsersManagementPage: React.FC = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showPlanifierModal, setShowPlanifierModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [addForm, setAddForm] = useState({
+    matricule: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    department: '',
+    jobTitle: '',
+    gender: 'M' as 'M' | 'F',
+    role: 'PATIENT' as EmployeeRole,
+    bloodGroup: ''
+  });
+
   const [editForm, setEditForm] = useState<Partial<Employee>>({});
   const [planifierForm, setPlanifierForm] = useState({ date: '', heure: '08:00', type: 'SYSTEMATIQUE', notes: '' });
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const loadEmployees = async () => {
+    setIsLoading(true);
+    try {
+      const data = await apiService.getPatients();
+      const mapped: Employee[] = data.map((p, idx) => {
+        let role: EmployeeRole = 'PATIENT';
+        const userRole = ((p as any).user?.role || (p as any).role || '').toString().toUpperCase();
+        const cat = ((p.category as string) || '').toUpperCase();
+        if (cat === 'MEDECIN' || userRole === 'DOCTOR' || userRole === 'MEDECIN') {
+          role = 'MEDECIN';
+        } else if (cat === 'ADMIN' || cat === 'RH' || userRole === 'HR' || userRole === 'ADMIN') {
+          role = 'ADMIN';
+        }
+
+        return {
+          id: p.id,
+          matricule: p.matricule,
+          firstName: p.firstName,
+          lastName: p.lastName,
+          gender: p.gender || 'M',
+          email: p.email || (p as any).user?.email || `${p.matricule}@bcrg-guinee.org`,
+          phone: p.phone || '',
+          department: p.department || 'Administration',
+          poste: p.jobTitle || 'Collaborateur',
+          role,
+          status: 'ACTIF',
+          dateEmbauche: p.createdAt ? p.createdAt.split('T')[0] : '2024-01-01',
+          lastVisit: idx % 3 === 0 ? '2025-11-12' : null,
+          nextVisit: idx % 2 === 0 ? '2026-11-15' : null,
+          visiteStatus: idx % 4 === 0 ? 'EN_RETARD' : idx % 3 === 0 ? 'BIENTOT_DUE' : 'A_JOUR',
+          createdAt: p.createdAt,
+          bloodGroup: p.bloodGroup
+        };
+      });
+      setEmployees(mapped);
+    } catch (e) {
+      console.error('Erreur chargement employés:', e);
+      showToast('Erreur', 'Impossible de charger la liste des employés', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadEmployees();
+  }, []);
+
+  const DEPARTMENTS = Array.from(new Set(employees.map(e => e.department).filter(Boolean)));
 
   // Stats
   const total = employees.length;
@@ -101,11 +156,11 @@ export const UsersManagementPage: React.FC = () => {
   const filtered = employees.filter(e => {
     const q = search.toLowerCase();
     const matchSearch = !search ||
-      e.firstName.toLowerCase().includes(q) ||
-      e.lastName.toLowerCase().includes(q) ||
-      e.matricule.toLowerCase().includes(q) ||
-      e.email.toLowerCase().includes(q) ||
-      e.department.toLowerCase().includes(q);
+      (e.firstName?.toLowerCase() || '').includes(q) ||
+      (e.lastName?.toLowerCase() || '').includes(q) ||
+      (e.matricule?.toLowerCase() || '').includes(q) ||
+      (e.email?.toLowerCase() || '').includes(q) ||
+      (e.department?.toLowerCase() || '').includes(q);
     const matchRole = filterRole === 'ALL' || e.role === filterRole;
     const matchStatus = filterStatus === 'ALL' || e.status === filterStatus;
     const matchDept = filterDept === 'ALL' || e.department === filterDept;
@@ -133,12 +188,14 @@ export const UsersManagementPage: React.FC = () => {
     setEmployees(prev => prev.map(e => e.id === id ? { ...e, status: e.status === 'SUSPENDU' ? 'ACTIF' : 'SUSPENDU' } : e));
     setActiveMenu(null);
     if (selectedEmployee?.id === id) setSelectedEmployee(prev => prev ? { ...prev, status: prev.status === 'SUSPENDU' ? 'ACTIF' : 'SUSPENDU' } : null);
+    showToast('Statut mis à jour', 'Le statut du compte a été modifié.', 'info');
   };
 
   const handleDelete = (id: string) => {
     setEmployees(prev => prev.filter(e => e.id !== id));
     setActiveMenu(null);
     if (selectedEmployee?.id === id) setSelectedEmployee(null);
+    showToast('Dossier retiré', 'Le dossier a été retiré de la vue.', 'info');
   };
 
   const openEdit = (emp: Employee) => {
@@ -147,15 +204,8 @@ export const UsersManagementPage: React.FC = () => {
     setActiveMenu(null);
   };
 
-  const handleEditSave = () => {
-    if (!editForm.id) return;
-    setEmployees(prev => prev.map(e => e.id === editForm.id ? { ...e, ...editForm } as Employee : e));
-    if (selectedEmployee?.id === editForm.id) setSelectedEmployee(prev => prev ? { ...prev, ...editForm } as Employee : null);
-    setShowEditModal(false);
-  };
-
-  const openPlanifier = (emp: Employee) => {
-    setSelectedEmployee(emp);
+  const openPlanifier = (emp: Employee | null) => {
+    if (emp) setSelectedEmployee(emp);
     setPlanifierForm({ date: '', heure: '08:00', type: 'SYSTEMATIQUE', notes: '' });
     setShowPlanifierModal(true);
     setActiveMenu(null);
@@ -163,15 +213,102 @@ export const UsersManagementPage: React.FC = () => {
 
   const handlePlanifierSave = () => {
     if (!planifierForm.date || !selectedEmployee) return;
-    const newNextVisit = planifierForm.date;
-    setEmployees(prev => prev.map(e =>
-      e.id === selectedEmployee.id ? { ...e, nextVisit: newNextVisit, visiteStatus: 'BIENTOT_DUE' } : e
-    ));
-    setSelectedEmployee(prev => prev ? { ...prev, nextVisit: newNextVisit, visiteStatus: 'BIENTOT_DUE' } : null);
+    showToast('Visite planifiée', `Visite médicale programmée pour ${selectedEmployee.firstName} ${selectedEmployee.lastName} le ${planifierForm.date}.`, 'success');
     setShowPlanifierModal(false);
   };
 
-  const initials = (e: Employee) => `${e.firstName[0]}${e.lastName[0]}`.toUpperCase();
+  const handleEditSave = async () => {
+    if (!editForm.id) return;
+    setIsSubmitting(true);
+    const res = await apiService.savePatient({
+      id: editForm.id,
+      phone: editForm.phone,
+      department: editForm.department,
+      jobTitle: editForm.poste,
+      bloodGroup: editForm.bloodGroup
+    });
+    setIsSubmitting(false);
+
+    if (res.success) {
+      showToast('Succès', 'Profil employé mis à jour.', 'success');
+      setShowEditModal(false);
+      loadEmployees();
+    } else {
+      showToast('Erreur', res.error || 'Erreur lors de la mise à jour.', 'error');
+    }
+  };
+
+  const handleAddSave = async () => {
+    if (!addForm.matricule || !addForm.firstName || !addForm.lastName || !addForm.department || !addForm.jobTitle) {
+      showToast('Champs requis', 'Veuillez remplir au moins le matricule, nom, prénom, direction et poste.', 'error');
+      return;
+    }
+    setIsSubmitting(true);
+    const res = await apiService.savePatient({
+      matricule: addForm.matricule,
+      firstName: addForm.firstName,
+      lastName: addForm.lastName,
+      email: addForm.email,
+      phone: addForm.phone,
+      gender: addForm.gender,
+      department: addForm.department,
+      jobTitle: addForm.jobTitle,
+      bloodGroup: addForm.bloodGroup
+    });
+    setIsSubmitting(false);
+
+    if (res.success) {
+      showToast('Employé créé', 'Le collaborateur a été ajouté avec succès.', 'success');
+      setShowAddModal(false);
+      setAddForm({
+        matricule: '',
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        department: '',
+        jobTitle: '',
+        gender: 'M',
+        role: 'PATIENT',
+        bloodGroup: ''
+      });
+      loadEmployees();
+    } else {
+      showToast('Erreur', res.error || 'Impossible d\'ajouter l\'employé.', 'error');
+    }
+  };
+
+  const handleExportCsv = () => {
+    if (employees.length === 0) {
+      showToast('Aucune donnée', 'Aucun employé à exporter.', 'info');
+      return;
+    }
+    const headers = ['Matricule', 'Nom', 'Prenom', 'Genre', 'Email', 'Telephone', 'Direction', 'Poste', 'Statut', 'Visite'];
+    const rows = employees.map(e => [
+      `"${e.matricule}"`,
+      `"${e.lastName}"`,
+      `"${e.firstName}"`,
+      `"${e.gender}"`,
+      `"${e.email}"`,
+      `"${e.phone}"`,
+      `"${e.department}"`,
+      `"${e.poste}"`,
+      `"${e.status}"`,
+      `"${e.visiteStatus}"`
+    ]);
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Employes_BCRG_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast('Export réussi', 'Le fichier CSV a été téléchargé.', 'success');
+  };
+
+  const initials = (e: Employee) => `${(e.firstName || ' ')[0]}${(e.lastName || ' ')[0]}`.toUpperCase();
 
   const avatarColor = (role: EmployeeRole) => {
     const map: Record<EmployeeRole, string> = {
@@ -213,7 +350,10 @@ export const UsersManagementPage: React.FC = () => {
               <UserPlus className="w-4 h-4" />
               Ajouter un employé
             </button>
-            <button className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 border border-white/30 text-sm font-medium hover:bg-white/20 transition-colors">
+            <button
+              onClick={handleExportCsv}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 border border-white/30 text-sm font-medium hover:bg-white/20 transition-colors"
+            >
               <Download className="w-4 h-4" />
               Exporter (CSV)
             </button>
@@ -635,52 +775,128 @@ export const UsersManagementPage: React.FC = () => {
                   </button>
                 </div>
                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[
-                    { label: 'Matricule *', placeholder: 'Ex: BCRG-2050', type: 'text' },
-                    { label: 'Prénom *', placeholder: 'Prénom', type: 'text' },
-                    { label: 'Nom *', placeholder: 'Nom de famille', type: 'text' },
-                    { label: 'Email professionnel *', placeholder: 'prenom.nom@bcrg-guinee.org', type: 'email' },
-                    { label: 'Téléphone', placeholder: '620 00 00 00', type: 'tel' },
-                    { label: 'Date d\'embauche', placeholder: '', type: 'date' },
-                    { label: 'Poste', placeholder: 'Intitulé du poste', type: 'text' },
-                  ].map(field => (
-                    <div key={field.label}>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">{field.label}</label>
-                      <input
-                        type={field.type}
-                        placeholder={field.placeholder}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#1b3b31] outline-none transition-colors"
-                      />
-                    </div>
-                  ))}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Matricule *</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: 1042"
+                      value={addForm.matricule}
+                      onChange={e => setAddForm(f => ({ ...f, matricule: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#1b3b31] outline-none transition-colors"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Prénom *</label>
+                    <input
+                      type="text"
+                      placeholder="Prénom"
+                      value={addForm.firstName}
+                      onChange={e => setAddForm(f => ({ ...f, firstName: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#1b3b31] outline-none transition-colors"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Nom *</label>
+                    <input
+                      type="text"
+                      placeholder="Nom de famille"
+                      value={addForm.lastName}
+                      onChange={e => setAddForm(f => ({ ...f, lastName: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#1b3b31] outline-none transition-colors"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Email professionnel</label>
+                    <input
+                      type="email"
+                      placeholder="prenom.nom@bcrg-guinee.org"
+                      value={addForm.email}
+                      onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#1b3b31] outline-none transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Téléphone</label>
+                    <input
+                      type="tel"
+                      placeholder="620 00 00 00"
+                      value={addForm.phone}
+                      onChange={e => setAddForm(f => ({ ...f, phone: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#1b3b31] outline-none transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Poste *</label>
+                    <input
+                      type="text"
+                      placeholder="Intitulé du poste"
+                      value={addForm.jobTitle}
+                      onChange={e => setAddForm(f => ({ ...f, jobTitle: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#1b3b31] outline-none transition-colors"
+                      required
+                    />
+                  </div>
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Genre</label>
-                    <select className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#1b3b31] outline-none">
+                    <select
+                      value={addForm.gender}
+                      onChange={e => setAddForm(f => ({ ...f, gender: e.target.value as 'M' | 'F' }))}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#1b3b31] outline-none"
+                    >
                       <option value="M">Masculin</option>
                       <option value="F">Féminin</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Rôle d'accès</label>
-                    <select className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#1b3b31] outline-none">
-                      {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Groupe sanguin</label>
+                    <select
+                      value={addForm.bloodGroup}
+                      onChange={e => setAddForm(f => ({ ...f, bloodGroup: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#1b3b31] outline-none"
+                    >
+                      <option value="">Non renseigné</option>
+                      <option value="A+">A+</option>
+                      <option value="A-">A-</option>
+                      <option value="B+">B+</option>
+                      <option value="B-">B-</option>
+                      <option value="AB+">AB+</option>
+                      <option value="AB-">AB-</option>
+                      <option value="O+">O+</option>
+                      <option value="O-">O-</option>
                     </select>
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Direction / Département</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Direction / Département *</label>
                     <input
                       type="text"
                       placeholder="Ex: Direction des Ressources Humaines"
+                      value={addForm.department}
+                      onChange={e => setAddForm(f => ({ ...f, department: e.target.value }))}
                       className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#1b3b31] outline-none transition-colors"
+                      required
                     />
                   </div>
                 </div>
                 <div className="p-4 border-t border-slate-100 flex justify-end gap-2">
                   <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Annuler</button>
-                  <button className="px-4 py-2 text-sm font-medium bg-[#1b3b31] text-white rounded-lg hover:bg-[#142c24] transition-colors">Enregistrer</button>
+                  <button
+                    onClick={handleAddSave}
+                    disabled={isSubmitting}
+                    className="px-4 py-2 text-sm font-medium bg-[#1b3b31] text-white rounded-lg hover:bg-[#142c24] transition-colors disabled:opacity-50"
+                  >
+                    {isSubmitting ? 'Enregistrement...' : 'Enregistrer'}
+                  </button>
                 </div>
               </div>
             </div>

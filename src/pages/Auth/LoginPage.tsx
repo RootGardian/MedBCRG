@@ -1,21 +1,73 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { User, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { User, Lock, Eye, EyeOff, LogIn, Globe, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotifications } from '../../hooks/useNotifications';
+import { apiService } from '../../services/api';
 import medLogo from '../../assets/icon_Med.png';
 
+const BCRG_HUB_URL = import.meta.env.VITE_BCRG_HUB_URL || 'http://localhost:5173';
+
 export const LoginPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const [matricule, setMatricule] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  const { login } = useAuth();
+  const [isSsoAuthenticating, setIsSsoAuthenticating] = useState(false);
+  const [ssoError, setSsoError] = useState<string | null>(null);
+
+  const { login, loginWithSso } = useAuth();
   const { showToast } = useNotifications();
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [userRoleAfterChange, setUserRoleAfterChange] = useState<string>('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const redirectByRole = (role?: string) => {
+    const r = (role || '').toUpperCase();
+    if (r === 'MEDECIN' || r === 'DOCTOR') {
+      navigate('/');
+      showToast('Bienvenue', 'Connexion réussie au portail Médecin', 'success');
+    } else if (r === 'ADMIN' || r === 'HR') {
+      navigate('/admin');
+      showToast('Bienvenue', 'Connexion réussie au portail Administration & RH', 'success');
+    } else {
+      navigate('/patient');
+      showToast('Bienvenue', 'Connexion réussie au portail Employé/Patient', 'success');
+    }
+  };
+
+  // Détection et traitement automatique d'un jeton SSO émis par le BCRG HUB
+  useEffect(() => {
+    const ssoToken = searchParams.get('sso_token');
+    if (ssoToken && !isSsoAuthenticating) {
+      setIsSsoAuthenticating(true);
+      loginWithSso(ssoToken)
+        .then((result) => {
+          if (result.success) {
+            redirectByRole(result.role);
+          } else {
+            setSsoError(result.error || 'Échec de validation du jeton SSO.');
+            setIsSsoAuthenticating(false);
+          }
+        })
+        .catch((err: any) => {
+          setSsoError(err.message || 'Échec de validation du jeton SSO.');
+          setIsSsoAuthenticating(false);
+        });
+    }
+  }, [searchParams, isSsoAuthenticating]);
+
+  const handleHubSsoRedirect = () => {
+    window.location.href = BCRG_HUB_URL;
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!matricule || !password) {
@@ -25,27 +77,59 @@ export const LoginPage: React.FC = () => {
 
     setIsLoading(true);
     
-    // Simulation d'appel API
-    setTimeout(() => {
-      setIsLoading(false);
-      
-      if (matricule === '2000' && password === 'medi1') {
-        login('MEDECIN');
-        navigate('/');
-        showToast('Bienvenue', 'Connexion réussie au portail Médecin', 'success');
-      } else if (matricule === '2001' && password === 'medi1') {
-        login('ADMIN');
-        navigate('/admin');
-        showToast('Bienvenue', 'Connexion réussie au portail Administration & RH', 'success');
-      } else if (matricule === '2002' && password === 'medi1') {
-        login('PATIENT');
-        navigate('/patient');
-        showToast('Bienvenue', 'Connexion réussie au portail Employé/Patient', 'success');
+    const result = await login(matricule.trim(), password.trim());
+    setIsLoading(false);
+
+    if (result.success) {
+      if (result.isFirstLogin) {
+        setUserRoleAfterChange(result.role || 'PATIENT');
+        setShowFirstLoginModal(true);
+        showToast('Première connexion', 'Veuillez définir votre mot de passe personnalisé pour activer votre compte.', 'info');
       } else {
-        showToast('Échec', 'Matricule ou mot de passe incorrect.', 'error');
+        redirectByRole(result.role);
       }
-    }, 800);
+    } else {
+      showToast('Échec', result.error || 'Matricule ou mot de passe incorrect.', 'error');
+    }
   };
+
+  const handleChangeInitialPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || !confirmPassword) {
+      showToast('Champs requis', 'Veuillez saisir votre nouveau mot de passe et sa confirmation.', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast('Erreur', 'Les deux mots de passe ne correspondent pas.', 'error');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    const res = await apiService.changeInitialPassword(password.trim(), newPassword.trim(), confirmPassword.trim());
+    setIsChangingPassword(false);
+
+    if (res.success) {
+      showToast('Mot de passe mis à jour', 'Votre compte est maintenant activé.', 'success');
+      setShowFirstLoginModal(false);
+      redirectByRole(userRoleAfterChange);
+    } else {
+      showToast('Erreur', res.error || 'Impossible de changer le mot de passe.', 'error');
+    }
+  };
+
+  if (isSsoAuthenticating) {
+    return (
+      <div className="min-h-screen flex w-full items-center justify-center bg-slate-50">
+        <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-xl text-center space-y-4 border border-slate-100 animate-in fade-in">
+          <div className="w-12 h-12 border-4 border-[#1b3b31]/20 border-t-[#1b3b31] rounded-full animate-spin mx-auto" />
+          <h3 className="text-lg font-bold text-slate-800">Validation SSO BCRG HUB...</h3>
+          <p className="text-xs text-slate-500">
+            Authentification fédérée et sécurisation de votre session médicale en cours.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex w-full">
@@ -79,9 +163,45 @@ export const LoginPage: React.FC = () => {
             <h1 className="text-4xl font-extrabold text-[#1b3b31] tracking-tight">MedBCRG</h1>
           </div>
 
-          <div className="mb-10 text-left">
+          <div className="mb-8 text-left">
             <h2 className="text-2xl font-extrabold text-slate-800 mb-2">Connexion</h2>
-            <p className="text-slate-500 text-xs">Veuillez renseigner vos identifiants pour accéder à l'application.</p>
+            <p className="text-slate-500 text-xs">
+              Connectez-vous via le portail unique <strong>BCRG HUB</strong> ou vos identifiants internes.
+            </p>
+          </div>
+
+          {/* Alerte Erreur SSO */}
+          {ssoError && (
+            <div className="mb-6 rounded-xl bg-red-50 border border-red-200 p-3.5 text-xs text-red-700 flex items-start gap-2.5 animate-in fade-in">
+              <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
+              <div>
+                <strong className="font-semibold">Échec de la connexion SSO :</strong> {ssoError}
+              </div>
+            </div>
+          )}
+
+          {/* Bouton SSO BCRG HUB */}
+          <div className="mb-6 space-y-2">
+            <button
+              type="button"
+              onClick={handleHubSsoRedirect}
+              className="w-full h-12 bg-white hover:bg-emerald-50/60 border-2 border-[#1b3b31] text-[#1b3b31] font-semibold rounded-lg flex items-center justify-center gap-2.5 shadow-sm hover:shadow transition-all group"
+            >
+              <Globe className="w-5 h-5 text-[#1b3b31] group-hover:rotate-12 transition-transform" />
+              <span>Connexion unique via BCRG HUB (SSO)</span>
+            </button>
+            <p className="text-[11px] text-center text-slate-400">
+              Accès direct sécurisé fédéré avec l'Active Directory de la Banque Centrale.
+            </p>
+          </div>
+
+          {/* Séparateur */}
+          <div className="relative my-6 flex items-center">
+            <div className="flex-grow border-t border-slate-200" />
+            <span className="mx-3 flex-shrink text-[11px] uppercase tracking-wider text-slate-400 font-bold">
+              Ou par matricule & mot de passe
+            </span>
+            <div className="flex-grow border-t border-slate-200" />
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
@@ -153,6 +273,63 @@ export const LoginPage: React.FC = () => {
           © {new Date().getFullYear()} Banque Centrale de la République de Guinée. Tous droits réservés.
         </p>
       </div>
+
+      {/* Modal Changement obligatoire du premier mot de passe */}
+      {showFirstLoginModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-emerald-50 text-[#1b3b31] flex items-center justify-center">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">Sécurité du compte</h3>
+                <p className="text-xs text-slate-500">Première connexion : modifiez votre mot de passe</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 mb-6 bg-slate-50 p-3 rounded-xl border border-slate-100">
+              Pour des raisons de conformité et de sécurité médicale, vous devez obligatoirement choisir un nouveau mot de passe personnel avant d'accéder à votre espace.
+            </p>
+
+            <form onSubmit={handleChangeInitialPassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Nouveau mot de passe *</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="Minimum 8 caractères (Maj, min, chiffre, symbole)"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#1b3b31] outline-none transition-colors"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Confirmer le nouveau mot de passe *</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  placeholder="Répétez le mot de passe"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#1b3b31] outline-none transition-colors"
+                  required
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isChangingPassword}
+                  className="w-full bg-[#1b3b31] hover:bg-[#122821] text-white font-medium py-2.5 rounded-lg text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isChangingPassword ? 'Enregistrement...' : 'Activer mon compte'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

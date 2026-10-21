@@ -1,10 +1,34 @@
 import React, { useState } from 'react';
 import { Upload, FileText, ArrowLeft, ShieldCheck, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { apiService } from '../../services/api';
+import { useNotifications } from '../../hooks/useNotifications';
 
 export const PatientDocumentsPage: React.FC = () => {
   const navigate = useNavigate();
+  const { showToast } = useNotifications();
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [docType, setDocType] = useState('LAB_RESULT');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFile) {
+      showToast('Fichier requis', 'Veuillez sélectionner un fichier (PDF, JPG, PNG).', 'error');
+      return;
+    }
+    setIsUploading(true);
+    const res = await apiService.uploadMyDocument(docType, selectedFile);
+    setIsUploading(false);
+
+    if (res.success) {
+      setIsSuccessModalOpen(true);
+      showToast('Document envoyé', 'Votre document a été importé dans votre dossier médical.', 'success');
+    } else {
+      showToast('Erreur', res.error || 'Échec de l\'envoi du document.', 'error');
+    }
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
@@ -33,22 +57,26 @@ export const PatientDocumentsPage: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
-        <form className="space-y-8" onSubmit={(e) => { e.preventDefault(); setIsSuccessModalOpen(true); }}>
+        <form className="space-y-8" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Type de document</label>
-              <select className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-[#1b3b31] focus:ring-1 focus:ring-[#1b3b31] text-sm bg-slate-50 transition-all">
-                <option>Résultats d'analyses (Laboratoire)</option>
-                <option>Imagerie (Radio, IRM, Scanner)</option>
-                <option>Compte rendu spécialiste externe</option>
-                <option>Certificat médical</option>
-                <option>Autre document médical</option>
+              <select
+                value={docType}
+                onChange={e => setDocType(e.target.value)}
+                className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-[#1b3b31] focus:ring-1 focus:ring-[#1b3b31] text-sm bg-slate-50 transition-all"
+              >
+                <option value="LAB_RESULT">Résultats d'analyses (Laboratoire)</option>
+                <option value="IMAGING">Imagerie (Radio, IRM, Scanner)</option>
+                <option value="SPECIALIST_REPORT">Compte rendu spécialiste externe</option>
+                <option value="MEDICAL_CERTIFICATE">Certificat médical</option>
+                <option value="OTHER">Autre document médical</option>
               </select>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Date de l'examen</label>
-              <input type="date" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-[#1b3b31] focus:ring-1 focus:ring-[#1b3b31] text-sm bg-slate-50 transition-all" required />
+              <input type="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-[#1b3b31] focus:ring-1 focus:ring-[#1b3b31] text-sm bg-slate-50 transition-all" required />
             </div>
           </div>
 
@@ -63,16 +91,27 @@ export const PatientDocumentsPage: React.FC = () => {
 
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">Fichier à importer</label>
-            <div className="mt-2 flex justify-center px-6 pt-10 pb-12 border-2 border-slate-300 border-dashed rounded-2xl hover:border-[#1b3b31] hover:bg-slate-50 transition-all cursor-pointer group">
+            <div className={`mt-2 flex justify-center px-6 pt-10 pb-12 border-2 ${selectedFile ? 'border-emerald-500 bg-emerald-50/20' : 'border-slate-300'} border-dashed rounded-2xl hover:border-[#1b3b31] hover:bg-slate-50 transition-all cursor-pointer group`}>
               <div className="space-y-2 text-center">
                 <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto group-hover:bg-[#1b3b31]/10 transition-colors">
                   <Upload className="mx-auto h-8 w-8 text-slate-400 group-hover:text-[#1b3b31] transition-colors" />
                 </div>
                 <div className="flex text-sm text-slate-600 justify-center mt-4">
-                  <span className="relative rounded-md font-bold text-[#1b3b31] hover:text-[#122821] focus-within:outline-none">
-                    <span>Cliquez pour sélectionner un fichier</span>
-                    <input id="file-upload" name="file-upload" type="file" className="sr-only" required />
-                  </span>
+                  <label htmlFor="file-upload" className="relative rounded-md font-bold text-[#1b3b31] hover:text-[#122821] cursor-pointer focus-within:outline-none">
+                    <span>{selectedFile ? selectedFile.name : 'Cliquez pour sélectionner un fichier'}</span>
+                    <input
+                      id="file-upload"
+                      name="file-upload"
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={e => {
+                        if (e.target.files && e.target.files[0]) {
+                          setSelectedFile(e.target.files[0]);
+                        }
+                      }}
+                      className="sr-only"
+                    />
+                  </label>
                 </div>
                 <p className="text-xs text-slate-500 font-medium mt-2">ou glissez-déposez votre fichier ici</p>
                 <p className="text-xs text-slate-400 mt-1">Formats acceptés : PDF, JPG, PNG (jusqu'à 10 MB)</p>
@@ -94,10 +133,11 @@ export const PatientDocumentsPage: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="px-6 py-3 text-sm font-semibold text-white bg-[#1b3b31] hover:bg-[#122821] rounded-xl transition-colors shadow-sm flex items-center gap-2"
+              disabled={isUploading}
+              className="px-6 py-3 text-sm font-semibold text-white bg-[#1b3b31] hover:bg-[#122821] rounded-xl transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50"
             >
               <Upload className="w-4 h-4" />
-              Envoyer le document
+              {isUploading ? 'Téléversement...' : 'Envoyer le document'}
             </button>
           </div>
         </form>

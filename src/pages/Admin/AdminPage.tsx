@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Users, Shield, CalendarClock, Bell, Activity,
   Settings2, Calendar, Building, CheckCircle, Clock, ChevronDown,
-  FileText, ListPlus
+  FileText, ListPlus, Download, Droplet
 } from 'lucide-react';
 import { useNotifications } from '../../hooks/useNotifications';
+import { apiService } from '../../services/api';
+import { HrDashboardData, HrStatisticsData, HrDiabetesStatisticsData } from '../../types';
 
 export const AdminPage: React.FC = () => {
   const location = useLocation();
@@ -19,7 +21,7 @@ export const AdminPage: React.FC = () => {
   if (path.includes('/admin/logs')) activeTab = 'logs';
 
   const tabInfo: Record<string, { title: string, desc: string }> = {
-    stats: { title: 'Tableau de bord admin', desc: 'Vue globale de la médecine du travail, taux de couverture et suivi des statistiques RH.' },
+    stats: { title: 'Tableau de bord admin & RH', desc: 'Vue globale de la médecine du travail, pilotage des indicateurs RH et suivi de la santé au travail.' },
     users: { title: 'Gestion des comptes', desc: 'Gérez les accès, rôles et permissions des utilisateurs de l\'application.' },
     settings: { title: 'Périodicité des Visites', desc: 'Gérez la fréquence des visites médicales obligatoires selon le profil des employés.' },
     logs: { title: 'Historique & Logs', desc: 'Trace d\'audit et journal d\'activité du système.' },
@@ -29,28 +31,57 @@ export const AdminPage: React.FC = () => {
 
   const [showTimeMenu, setShowTimeMenu] = useState(false);
   const [timeFilter, setTimeFilter] = useState('Aujourd\'hui');
+  const [isExporting, setIsExporting] = useState(false);
+  const [hrData, setHrData] = useState<HrDashboardData | null>(null);
+  const [hrStats, setHrStats] = useState<HrStatisticsData | null>(null);
+  const [hrDiabetes, setHrDiabetes] = useState<HrDiabetesStatisticsData | null>(null);
   const timeOptions = ['Aujourd\'hui', 'Cette semaine', 'Ce mois', 'Cette année', 'Toutes les dates'];
 
   // Date du jour formatée
   const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 
-  const stats = (() => {
-    switch (timeFilter) {
-      case "Aujourd'hui": return { couv: '82.4%', ech: 3, sui: 1250, arr: 1, urg: 0, cons: 5, obl: 2, inc: 0 };
-      case "Cette semaine": return { couv: '82.4%', ech: 15, sui: 1250, arr: 4, urg: 1, cons: 35, obl: 12, inc: 2 };
-      case "Ce mois": return { couv: '82.5%', ech: 45, sui: 1250, arr: 12, urg: 3, cons: 140, obl: 45, inc: 5 };
-      default: return { couv: '84.1%', ech: 145, sui: 1250, arr: 24, urg: 12, cons: 1254, obl: 432, inc: 12 };
-    }
-  })();
+  useEffect(() => {
+    apiService.getHrDashboard().then(res => {
+      if (res) setHrData(res);
+    });
+    apiService.getHrStatistics().then(res => {
+      if (res) setHrStats(res);
+    });
+    apiService.getHrDiabetesStatistics().then(res => {
+      if (res) setHrDiabetes(res);
+    });
+  }, []);
 
-  const MOCK_LOGS = [
-    { id: 1, date: '23 Sept 2026, 09:15', user: 'Dr. Ousmane Bangoura', action: 'Clôture visite', colorClass: 'bg-emerald-50 text-emerald-700', details: 'Dossier médical mis à jour pour BCRG-2001' },
-    { id: 2, date: '23 Sept 2026, 08:42', user: 'Admin RH', action: 'Modification profil', colorClass: 'bg-blue-50 text-blue-700', details: 'Changement de poste pour l\'employé BCRG-2045' },
-    { id: 3, date: '22 Sept 2026, 17:30', user: 'Système (Auto)', action: 'Alerte relance', colorClass: 'bg-amber-50 text-amber-700', details: 'Envoi de 12 convocations de visite périodique' },
-    { id: 4, date: '22 Sept 2026, 14:10', user: 'Admin RH', action: 'Paramétrage', colorClass: 'bg-purple-50 text-purple-700', details: 'Mise à jour de la périodicité des visites SMR (6 mois)' },
-    { id: 5, date: '15 Août 2026, 10:00', user: 'Admin RH', action: 'Création compte', colorClass: 'bg-blue-50 text-blue-700', details: 'Nouveau compte infirmier créé' }
-  ];
-  
+  const handleExportPdf = async () => {
+    setIsExporting(true);
+    showToast('Exportation en cours', 'Génération du rapport officiel RH en cours...', 'info');
+    try {
+      await apiService.exportHrReportPdf();
+      showToast('Export réussi', 'Le rapport officiel RH a été téléchargé avec succès.', 'success');
+    } catch (e: any) {
+      showToast('Erreur', e.message || 'Impossible de télécharger le rapport.', 'error');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const totalEmp = hrData?.totalEmployees || 0;
+  const activeEmp = hrData?.activeEmployees || 0;
+  const coverageRate = totalEmp > 0 ? `${Math.round((activeEmp / totalEmp) * 100)}%` : '100%';
+
+  const stats = {
+    couv: coverageRate,
+    ech: 0,
+    sui: totalEmp,
+    arr: hrData?.employeesOnSickLeaveCurrent || 0,
+    urg: 0,
+    cons: hrData?.totalConsultationsThisMonth || 0,
+    obl: totalEmp,
+    inc: 0
+  };
+
+  const MOCK_LOGS: any[] = [];
+
   const filteredLogs = MOCK_LOGS.filter(log => {
     if (timeFilter === "Aujourd'hui") return log.date.includes('23 Sept');
     if (timeFilter === "Cette semaine") return log.date.includes('23 Sept') || log.date.includes('22 Sept');
@@ -76,8 +107,16 @@ export const AdminPage: React.FC = () => {
             <p className="text-white/80 text-sm">{currentTabInfo.desc}</p>
           </div>
           <div className="mt-4 md:mt-0 flex items-center gap-3">
+            <button
+              onClick={handleExportPdf}
+              disabled={isExporting}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/30 text-sm font-medium bg-white/10 text-white hover:bg-white/20 transition-colors disabled:opacity-50"
+            >
+              <Download className="w-4 h-4" />
+              {isExporting ? 'Génération...' : 'Exporter le rapport (PDF)'}
+            </button>
             {activeTab === 'logs' && (
-              <button 
+              <button
                 onClick={() => showToast('Export en cours', "Le téléchargement du journal d'audit au format PDF va démarrer.", 'info')}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/30 text-sm font-medium bg-white/10 text-white hover:bg-white/20 transition-colors"
               >
@@ -86,7 +125,7 @@ export const AdminPage: React.FC = () => {
               </button>
             )}
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setShowTimeMenu(!showTimeMenu)}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/30 text-sm font-medium bg-white/10 text-white hover:bg-white/20 transition-colors"
               >
@@ -94,23 +133,23 @@ export const AdminPage: React.FC = () => {
                 {timeFilter === 'Aujourd\'hui' ? today : timeFilter}
                 <ChevronDown className={`w-4 h-4 transition-transform ${showTimeMenu ? 'rotate-180' : ''}`} />
               </button>
-            
-            {showTimeMenu && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowTimeMenu(false)} />
-                <div className="absolute right-0 top-12 z-20 bg-white rounded-xl shadow-xl border border-slate-100 py-2 w-48 animate-in fade-in slide-in-from-top-2">
-                  {timeOptions.map(opt => (
-                    <button
-                      key={opt}
-                      onClick={() => { setTimeFilter(opt); setShowTimeMenu(false); }}
-                      className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 transition-colors ${timeFilter === opt ? 'font-bold text-[#1b3b31] bg-emerald-50/50' : 'text-slate-600'}`}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
+
+              {showTimeMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowTimeMenu(false)} />
+                  <div className="absolute right-0 top-12 z-20 bg-white rounded-xl shadow-xl border border-slate-100 py-2 w-48 animate-in fade-in slide-in-from-top-2">
+                    {timeOptions.map(opt => (
+                      <button
+                        key={opt}
+                        onClick={() => { setTimeFilter(opt); setShowTimeMenu(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 transition-colors ${timeFilter === opt ? 'font-bold text-[#1b3b31] bg-emerald-50/50' : 'text-slate-600'}`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -212,16 +251,6 @@ export const AdminPage: React.FC = () => {
                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">DOSSIERS INCOMPLETS</span>
                       <span className="text-2xl font-bold text-slate-800">{stats.inc}</span>
                     </div>
-
-                    <div className="bg-slate-50 p-4 rounded-xl flex flex-col justify-center border border-slate-100 md:col-span-1">
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">EN CONSULTATION</span>
-                      <span className="text-2xl font-bold text-slate-800">2</span>
-                    </div>
-
-                    <div className="bg-slate-50 p-4 rounded-xl flex flex-col justify-center border border-slate-100 md:col-span-2">
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">URGENCES SIGNALÉES (MOIS)</span>
-                      <span className="text-2xl font-bold text-slate-800">3</span>
-                    </div>
                   </div>
                 </div>
 
@@ -229,24 +258,7 @@ export const AdminPage: React.FC = () => {
                 <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                   <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">ÉVOLUTION DES VISITES</h3>
                   <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between items-end mb-2">
-                        <span className="text-xs text-slate-500 font-medium">2026-09-23</span>
-                        <span className="text-sm font-bold text-slate-800">1</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div className="bg-emerald-500 h-full rounded-full" style={{ width: '15%' }}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between items-end mb-2">
-                        <span className="text-xs text-slate-500 font-medium">2026-09-24</span>
-                        <span className="text-sm font-bold text-slate-800">9</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div className="bg-[#1b3b31] h-full rounded-full" style={{ width: '100%' }}></div>
-                      </div>
-                    </div>
+                    <div className="text-center text-slate-500 text-sm py-4">Aucune donnée disponible.</div>
                   </div>
                 </div>
               </div>
@@ -256,66 +268,31 @@ export const AdminPage: React.FC = () => {
                 <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                   <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">PAR MOTIF DE VISITE</h3>
                   <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between items-end mb-2">
-                        <span className="text-xs text-slate-600 font-medium">Consultation Courante</span>
-                        <span className="text-sm font-bold text-slate-800">842</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div className="bg-[#1b3b31] h-full rounded-full" style={{ width: '65%' }}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between items-end mb-2">
-                        <span className="text-xs text-slate-600 font-medium">Visite Obligatoire</span>
-                        <span className="text-sm font-bold text-slate-800">400</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div className="bg-emerald-500 h-full rounded-full" style={{ width: '30%' }}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between items-end mb-2">
-                        <span className="text-xs text-slate-600 font-medium">Urgence / Autre</span>
-                        <span className="text-sm font-bold text-slate-800">12</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div className="bg-amber-500 h-full rounded-full" style={{ width: '5%' }}></div>
-                      </div>
-                    </div>
+                    <div className="text-center text-slate-500 text-sm py-4">Aucune donnée disponible.</div>
                   </div>
                 </div>
 
                 <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                   <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">PAR DIRECTION (BCRG)</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between items-end mb-2">
-                        <span className="text-xs text-slate-600 font-medium">Direction des Ressources Humaines (DRH)</span>
-                        <span className="text-sm font-bold text-slate-800">45</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div className="bg-[#1b3b31] h-full rounded-full" style={{ width: '45%' }}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between items-end mb-2">
-                        <span className="text-xs text-slate-600 font-medium">Direction de l'Émission</span>
-                        <span className="text-sm font-bold text-slate-800">32</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div className="bg-emerald-500 h-full rounded-full" style={{ width: '32%' }}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between items-end mb-2">
-                        <span className="text-xs text-slate-600 font-medium">Direction Informatique (DSI)</span>
-                        <span className="text-sm font-bold text-slate-800">23</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div className="bg-emerald-300 h-full rounded-full" style={{ width: '23%' }}></div>
-                      </div>
-                    </div>
+                  <div className="space-y-3">
+                    {hrStats && hrStats.byDepartment && hrStats.byDepartment.length > 0 ? (
+                      hrStats.byDepartment.map((dept) => (
+                        <div key={dept.department} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                          <div>
+                            <div className="font-semibold text-xs text-slate-800">{dept.department}</div>
+                            <div className="text-[10px] text-slate-400">{dept.employeeCount} collaborateur{dept.employeeCount > 1 ? 's' : ''}</div>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-xs font-bold text-[#1b3b31]">{dept.consultationCount} consult.</span>
+                            {dept.sickLeaveDays > 0 && (
+                              <div className="text-[10px] text-amber-600 font-medium">{dept.sickLeaveDays} j arrêt</div>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center text-slate-500 text-sm py-4">Aucune donnée disponible.</div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -347,28 +324,8 @@ export const AdminPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="text-sm text-slate-700">
-                  <tr className="border-b border-slate-50 hover:bg-slate-50/50">
-                    <td className="p-4 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">OB</div>
-                      <div>
-                        <div className="font-bold text-slate-800">Dr. Ousmane Bangoura</div>
-                        <div className="text-xs text-slate-500">o.bangoura@bcrg-guinee.org</div>
-                      </div>
-                    </td>
-                    <td className="p-4"><span className="px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 font-medium text-xs">Médecin</span></td>
-                    <td className="p-4"><span className="flex items-center gap-1.5 text-emerald-600 font-medium"><div className="w-2 h-2 rounded-full bg-emerald-500"></div>Actif</span></td>
-                    <td className="p-4 text-slate-500">Aujourd'hui, 08:30</td>
-                  </tr>
-                  <tr className="border-b border-slate-50 hover:bg-slate-50/50">
-                    <td className="p-4 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold">AD</div>
-                      <div>
-                        <div className="font-bold text-slate-800">Admin BCRG</div>
-                        <div className="text-xs text-slate-500">admin@bcrg-guinee.org</div>
-                      </div>
-                    </td>
-                    <td className="p-4"><span className="px-2.5 py-1 rounded-md bg-purple-50 text-purple-700 font-medium text-xs">Administrateur / RH</span></td>
-                    <td className="p-4"><span className="flex items-center gap-1.5 text-emerald-600 font-medium"><div className="w-2 h-2 rounded-full bg-emerald-500"></div>Actif</span></td>
+                  <tr>
+                    <td colSpan={4} className="p-8 text-center text-slate-500">Aucun compte pour le moment.</td>
                   </tr>
                 </tbody>
               </table>
@@ -387,7 +344,7 @@ export const AdminPage: React.FC = () => {
 
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-8 space-y-8">
-                
+
                 {/* Setting 1: Standard */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-slate-100">
                   <div className="flex gap-4 max-w-md">
@@ -458,7 +415,7 @@ export const AdminPage: React.FC = () => {
                 </div>
 
               </div>
-              
+
               {/* Footer / Save Action */}
               <div className="bg-slate-50 p-6 border-t border-slate-200 flex justify-end gap-3">
                 <button className="px-6 py-2.5 rounded-xl text-slate-600 font-medium hover:bg-slate-200 transition-colors">

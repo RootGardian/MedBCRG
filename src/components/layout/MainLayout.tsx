@@ -12,11 +12,15 @@ export const MainLayout: React.FC = () => {
   const [isMobileOpen, setIsMobileOpen] = React.useState(false);
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={`/login${location.search}`} replace />;
   }
 
   if (user?.role === 'ADMIN' && location.pathname === '/') {
     return <Navigate to="/admin/stats" replace />;
+  }
+
+  if (user?.role === 'PATIENT' && location.pathname === '/') {
+    return <Navigate to="/patient" replace />;
   }
 
   return (

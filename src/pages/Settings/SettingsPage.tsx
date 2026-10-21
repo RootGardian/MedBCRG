@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { 
-  ArrowLeft, Key, LogOut, Building2, Mail, 
+import {
+  ArrowLeft, Key, LogOut, Building2, Mail,
   User as UserIcon, Building, Phone, ShieldCheck, X
 } from 'lucide-react';
 
@@ -19,10 +19,10 @@ export const SettingsPage: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
-      
+
       {/* Top Actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <button 
+        <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 px-4 py-2 h-10 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm whitespace-nowrap"
         >
@@ -30,14 +30,14 @@ export const SettingsPage: React.FC = () => {
           Retour
         </button>
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-          <button 
+          <button
             onClick={() => setIsPasswordModalOpen(true)}
             className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2 h-10 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm whitespace-nowrap"
           >
             <Key className="w-4 h-4" />
             Changer le mot de passe
           </button>
-          <button 
+          <button
             onClick={logout}
             className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2 h-10 bg-rose-50 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors text-sm font-medium shadow-sm whitespace-nowrap"
           >
@@ -51,7 +51,7 @@ export const SettingsPage: React.FC = () => {
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Banner */}
         <div className="h-32 bg-[#1b3b31] w-full"></div>
-        
+
         {/* Profile Info */}
         <div className="px-8 pb-8 relative">
           <div className="flex justify-between items-end -mt-12 mb-4">
@@ -59,7 +59,7 @@ export const SettingsPage: React.FC = () => {
               {user?.name ? user.name.charAt(0).toUpperCase() + user.name.charAt(1).toUpperCase() : 'AD'}
             </div>
           </div>
-          
+
           <div className="flex justify-between items-center mt-2">
             <h1 className="text-2xl font-bold text-slate-800">{user?.name || 'Administrateur'}</h1>
             <div className="flex items-center gap-1.5 px-3 py-1 bg-purple-50 text-purple-700 rounded-full border border-purple-100 text-xs font-bold">
@@ -83,14 +83,14 @@ export const SettingsPage: React.FC = () => {
               <Building className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
               <div>
                 <p className="text-xs font-semibold text-slate-500 mb-0.5">FONCTION / POSTE</p>
-                <p className="text-sm text-slate-700 font-medium">Non renseigné</p>
+                <p className="text-sm text-slate-700 font-medium">{user?.jobTitle || 'Non renseigné'}</p>
               </div>
             </div>
             <div className="bg-slate-50 rounded-xl p-4 flex items-start gap-3 border border-slate-100">
               <span className="text-slate-400 font-bold text-lg leading-none mt-0.5">#</span>
               <div>
                 <p className="text-xs font-semibold text-slate-500 mb-0.5">MATRICULE AGENT / HÔTE</p>
-                <p className="text-sm text-slate-700 font-medium">Non renseigné</p>
+                <p className="text-sm text-slate-700 font-medium">{user?.matricule || 'Non renseigné'}</p>
               </div>
             </div>
           </div>
@@ -107,14 +107,14 @@ export const SettingsPage: React.FC = () => {
               <Mail className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
               <div>
                 <p className="text-xs font-semibold text-slate-500 mb-0.5">ADRESSE E-MAIL</p>
-                <p className="text-sm text-slate-700 font-medium">{user?.email || 'admin@bcrg-guinee.org'}</p>
+                <p className="text-sm text-slate-700 font-medium">{user?.email || 'Non renseigné'}</p>
               </div>
             </div>
             <div className="bg-slate-50 rounded-xl p-4 flex items-start gap-3 border border-slate-100">
               <Phone className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
               <div>
-                <p className="text-xs font-semibold text-slate-500 mb-0.5">TÉLÉPHONE / FLOTTE INTERNE</p>
-                <p className="text-sm text-slate-700 font-medium">Non renseigné</p>
+                <p className="text-xs font-semibold text-slate-500 mb-0.5">TÉLÉPHONE</p>
+                <p className="text-sm text-slate-700 font-medium">{user?.phone || 'Non renseigné'}</p>
               </div>
             </div>
           </div>
@@ -122,18 +122,6 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {/* Permissions */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex items-center gap-2">
-          <ShieldCheck className="w-5 h-5 text-[#1b3b31]" />
-          <h2 className="font-bold text-slate-800">Habilitations & Permissions Applicatives</h2>
-        </div>
-        <div className="p-6">
-          <p className="text-sm text-slate-500">
-            Droits standards associés au rôle <strong className="text-slate-700 font-semibold">{user?.role || 'Administrateur'}</strong>. Aucune permission spécifique additionnelle assignée.
-          </p>
-        </div>
-      </div>
-
       {/* Change Password Modal */}
       {isPasswordModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -143,7 +131,7 @@ export const SettingsPage: React.FC = () => {
                 <Key className="w-6 h-6 text-[#1b3b31]" />
                 Changer le mot de passe
               </h2>
-              <button 
+              <button
                 onClick={() => setIsPasswordModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-full transition-colors"
               >
